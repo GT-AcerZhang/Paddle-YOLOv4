@@ -365,17 +365,17 @@ if __name__ == '__main__':
     context = cfg.context
     # 预处理
     # sample_transforms
-    decodeImage = DecodeImage(with_mixup=with_mixup)  # 对图片解码。最开始的一步。
-    mixupImage = MixupImage()  # mixup增强
-    photometricDistort = PhotometricDistort()  # 颜色扭曲
-    randomCrop = RandomCrop()  # 随机裁剪
-    randomFlipImage = RandomFlipImage()  # 随机翻转
-    normalizeBox = NormalizeBox()  # 将物体的左上角坐标、右下角坐标中的横坐标/图片宽、纵坐标/图片高 以归一化坐标。
-    padBox = PadBox(cfg.num_max_boxes)  # 如果gt_bboxes的数量少于num_max_boxes，那么填充坐标是0的bboxes以凑够num_max_boxes。
-    bboxXYXY2XYWH = BboxXYXY2XYWH()  # sample['gt_bbox']被改写为cx_cy_w_h格式。
+    decodeImage = DecodeImage(with_mixup=with_mixup)   # 对图片解码。最开始的一步。
+    mixupImage = MixupImage()                   # mixup增强
+    photometricDistort = PhotometricDistort()   # 颜色扭曲
+    randomCrop = RandomCrop()                   # 随机裁剪
+    randomFlipImage = RandomFlipImage()         # 随机翻转
+    normalizeBox = NormalizeBox()               # 将物体的左上角坐标、右下角坐标中的横坐标/图片宽、纵坐标/图片高 以归一化坐标。
+    padBox = PadBox(cfg.num_max_boxes)          # 如果gt_bboxes的数量少于num_max_boxes，那么填充坐标是0的bboxes以凑够num_max_boxes。
+    bboxXYXY2XYWH = BboxXYXY2XYWH()             # sample['gt_bbox']被改写为cx_cy_w_h格式。
     # batch_transforms
-    randomShape = RandomShape()  # 多尺度训练。随机选一个尺度。也随机选一种插值方式。
-    normalizeImage = NormalizeImage(is_scale=True, is_channel_first=False)  # 图片归一化。直接除以255。
+    randomShape = RandomShape()                 # 多尺度训练。随机选一个尺度。也随机选一种插值方式。
+    normalizeImage = NormalizeImage(is_scale=True, is_channel_first=False)   # 图片归一化。直接除以255。
     gt2YoloTarget = Gt2YoloTarget(cfg.anchors,
                                   cfg.anchor_masks,
                                   cfg.downsample_ratios,
