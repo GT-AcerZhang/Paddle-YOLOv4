@@ -334,8 +334,8 @@ if __name__ == '__main__':
     exe = fluid.Executor(place)
     exe.run(startup_program)
 
-    # if cfg.pattern == 1:
-    #     fluid.io.load_persistables(exe, cfg.model_path, main_program=startup_program)
+    if cfg.pattern == 1:
+        fluid.io.load_params(exe, cfg.model_path, main_program=startup_program)
     _decode = Decode(cfg.conf_thresh, cfg.nms_thresh, cfg.input_shape, exe, test_program, class_names)
 
     # 种类id
