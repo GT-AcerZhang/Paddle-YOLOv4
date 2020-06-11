@@ -336,6 +336,9 @@ if __name__ == '__main__':
 
     if cfg.pattern == 1:
         fluid.io.load_params(exe, cfg.model_path, main_program=startup_program)
+        strs = cfg.model_path.split('step')
+        if len(strs) == 2:
+            iter_id = int(strs[1])
     _decode = Decode(cfg.conf_thresh, cfg.nms_thresh, cfg.input_shape, exe, test_program, class_names)
 
     # 种类id

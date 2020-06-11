@@ -37,7 +37,7 @@ class TrainConfig(object):
         self.batch_size = 4
         # 如果self.pattern = 1，需要指定self.model_path表示从哪个模型读取权重继续训练。
         self.model_path = 'yolov4'
-        # self.model_path = './weights/step00001000.h5'
+        # self.model_path = './weights/step00001000'
 
         # ========= 一些设置 =========
         # 每隔几步保存一次模型
