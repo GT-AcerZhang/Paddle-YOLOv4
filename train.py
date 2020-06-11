@@ -476,7 +476,7 @@ if __name__ == '__main__':
                         names.append(name)
                 if len(steps) > 10:
                     i = steps.index(min(steps))
-                    os.remove('./weights/' + names[i])
+                    shutil.rmtree('./weights/' + names[i])
                 logger.info('Save model to {}'.format(save_path))
 
             # ==================== eval ====================
