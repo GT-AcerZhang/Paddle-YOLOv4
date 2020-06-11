@@ -3,8 +3,8 @@
 # ================================================================
 #
 #   Author      : miemie2013
-#   Created date: 2020-01-11 16:31:57
-#   Description : paddlepaddle_yolov3
+#   Created date: 2020-06-10 10:20:27
+#   Description : paddlepaddle_yolov4
 #
 # ================================================================
 import datetime
@@ -483,7 +483,7 @@ if __name__ == '__main__':
                 logger.info('Save model to {}'.format(save_path))
 
             # ==================== eval ====================
-            if iter_id % cfg.eval_iter == 0:
+            '''if iter_id % cfg.eval_iter == 0:
                 box_ap = eval(_decode, eval_fetch_list, val_images, cfg.val_pre_path, cfg.val_path, cfg.eval_batch_size,
                               _clsid2catid, cfg.draw_image)
                 logger.info("box ap: %.3f" % (box_ap[0],))
@@ -495,7 +495,7 @@ if __name__ == '__main__':
                     best_ap_list[1] = iter_id
                     fluid.io.save_persistables(exe, './weights/best_model', train_program)
                 logger.info("Best test ap: {}, in iter: {}".format(
-                    best_ap_list[0], best_ap_list[1]))
+                    best_ap_list[0], best_ap_list[1]))'''
 
             # ==================== exit ====================
             if iter_id == cfg.max_iters:

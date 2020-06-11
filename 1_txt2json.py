@@ -3,7 +3,7 @@
 # ================================================================
 #
 #   Author      : miemie2013
-#   Created date: 2020-05-20 15:35:27
+#   Created date: 2020-06-10 10:20:27
 #   Description : Convert annotation files (txt format) into coco json format.
 #                 自定义数据集的注解转换成coco的注解格式。生成的json注解文件在annotation_json目录下。
 #

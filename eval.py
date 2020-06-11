@@ -11,10 +11,13 @@ from collections import deque
 import datetime
 import cv2
 import os
+import copy
+import json
 import time
 import numpy as np
+from tools.cocotools import eval
 import paddle.fluid as fluid
-from tools.cocotools import get_classes
+from tools.cocotools import get_classes, clsid2catid
 from model.yolov4 import YOLOv4
 from model.decode_np import Decode
 
@@ -27,34 +30,42 @@ logger = logging.getLogger(__name__)
 
 # 6G的卡，训练时如果要预测，则设置use_gpu = False，否则显存不足。
 use_gpu = False
-# use_gpu = True
+use_gpu = True
 
 
 if __name__ == '__main__':
     # classes_path = 'data/voc_classes.txt'
     classes_path = 'data/coco_classes.txt'
-    # model_path可以是'yolov4'、'./weights/step00001000.h5'这些。
-    model_path = 'yolov4'
-    # model_path = './weights/step00070000.h5'
+    # model_path可以是'yolov4'、'./weights/step00001000'这些。
+    # model_path = 'yolov4'
+    model_path = './weights/step00009000'
 
     # input_shape越大，精度会上升，但速度会下降。
     # input_shape = (320, 320)
-    input_shape = (416, 416)
-    # input_shape = (608, 608)
-
+    # input_shape = (416, 416)
+    input_shape = (608, 608)
     # 验证时的分数阈值和nms_iou阈值
-    conf_thresh = 0.05
+    conf_thresh = 0.001
     nms_thresh = 0.45
+    # 是否画出验证集图片
+    draw_image = False
+    # 验证时的批大小
+    eval_batch_size = 4
 
-    # 是否给图片画框。不画可以提速。读图片、后处理还可以继续优化。
-    draw_image = True
-    # draw_image = False
-
+    # 验证集图片的相对路径
+    # eval_pre_path = '../VOCdevkit/VOC2012/JPEGImages/'
+    # anno_file = 'annotation_json/voc2012_val.json'
+    eval_pre_path = '../data/data7122/val2017/'
+    anno_file = '../data/data7122/annotations/instances_val2017.json'
+    with open(anno_file, 'r', encoding='utf-8') as f2:
+        for line in f2:
+            line = line.strip()
+            dataset = json.loads(line)
+            images = dataset['images']
 
     num_anchors = 3
     all_classes = get_classes(classes_path)
     num_classes = len(all_classes)
-
 
 
     train_program = fluid.Program()
@@ -76,39 +87,10 @@ if __name__ == '__main__':
     _decode = Decode(conf_thresh, nms_thresh, input_shape, exe, test_program, all_classes)
 
 
-    path_dir = os.listdir('images/test')
-    # warm up
-    if use_gpu:
-        for k, filename in enumerate(path_dir):
-            image = cv2.imread('images/test/' + filename)
-            image, boxes, scores, classes = _decode.detect_image(image, fetch_list, draw_image=False)
-            if k == 10:
-                break
-
-
-    time_stat = deque(maxlen=20)
-    start_time = time.time()
-    end_time = time.time()
-    num_imgs = len(path_dir)
-    start = time.time()
-    for k, filename in enumerate(path_dir):
-        image = cv2.imread('images/test/' + filename)
-        image, boxes, scores, classes = _decode.detect_image(image, fetch_list, draw_image)
-
-        # 估计剩余时间
-        start_time = end_time
-        end_time = time.time()
-        time_stat.append(end_time - start_time)
-        time_cost = np.mean(time_stat)
-        eta_sec = (num_imgs - k) * time_cost
-        eta = str(datetime.timedelta(seconds=int(eta_sec)))
-
-        logger.info('Infer iter {}, num_imgs={}, eta={}.'.format(k, num_imgs, eta))
-        if draw_image:
-            cv2.imwrite('images/res/' + filename, image)
-            logger.info("Detection bbox results save in images/res/{}".format(filename))
-    cost = time.time() - start
-    logger.info('total time: {0:.6f}s'.format(cost))
-    logger.info('Speed: %.6fs per image,  %.1f FPS.'%((cost / num_imgs), (num_imgs / cost)))
-
+    _clsid2catid = copy.deepcopy(clsid2catid)
+    if num_classes != 80:   # 如果不是COCO数据集，而是自定义数据集
+        _clsid2catid = {}
+        for k in range(num_classes):
+            _clsid2catid[k] = k
+    box_ap = eval(_decode, fetch_list, images, eval_pre_path, anno_file, eval_batch_size, _clsid2catid, draw_image)
 

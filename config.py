@@ -3,7 +3,7 @@
 # ================================================================
 #
 #   Author      : miemie2013
-#   Created date: 2020-06-05 15:35:27
+#   Created date: 2020-06-10 10:20:27
 #   Description : 配置文件。
 #
 # ================================================================
@@ -41,9 +41,9 @@ class TrainConfig(object):
 
         # ========= 一些设置 =========
         # 每隔几步保存一次模型
-        self.save_iter = 20
+        self.save_iter = 1000
         # 每隔几步计算一次eval集的mAP
-        self.eval_iter = 40
+        self.eval_iter = 5000000
         # 训练多少步
         self.max_iters = 800000
 

@@ -45,6 +45,29 @@ nohup python train.py>> train.txt 2>&1 &
 python demo.py
 
 
+--------------------------eval--------------------------
+python eval.py
+
+
+rm -f eval.txt
+nohup python eval.py>> eval.txt 2>&1 &
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
