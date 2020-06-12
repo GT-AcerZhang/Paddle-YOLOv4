@@ -3,7 +3,7 @@
 # ================================================================
 #
 #   Author      : miemie2013
-#   Created date: 2020-06-10 10:20:27
+#   Created date: 2020-05-20 15:35:27
 #   Description : Convert annotation files (txt format) into coco json format.
 #                 自定义数据集的注解转换成coco的注解格式。生成的json注解文件在annotation_json目录下。
 #
@@ -97,7 +97,7 @@ if __name__ == '__main__':
             h = y2 - y1
             anno = {
                 'segmentation': [[]],
-                'area': 3.14,
+                'area': w*h,
                 'iscrowd': 0,
                 'image_id': im_id,
                 'bbox': [x1, y1, w, h],
@@ -145,7 +145,7 @@ if __name__ == '__main__':
             h = y2 - y1
             anno = {
                 'segmentation': [[]],
-                'area': 3.14,
+                'area': w*h,
                 'iscrowd': 0,
                 'image_id': im_id,
                 'bbox': [x1, y1, w, h],
