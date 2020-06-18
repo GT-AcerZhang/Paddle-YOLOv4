@@ -6,6 +6,10 @@
 Paddle-YOLOv4,参考自https://github.com/miemie2013/Keras-YOLOv4
 和https://github.com/Tianxiaomo/pytorch-YOLOv4
 
+## 推荐
+本项目已经开源到AIStudio中，可直接跑：
+https://aistudio.baidu.com/aistudio/projectdetail/570310
+
 ## 传送门
 
 Keras版YOLOv3: https://github.com/miemie2013/Keras-DIOU-YOLOv3
