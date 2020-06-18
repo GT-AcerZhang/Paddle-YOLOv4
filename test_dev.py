@@ -3,15 +3,16 @@
 # ================================================================
 #
 #   Author      : miemie2013
-#   Created date: 2020-05-20 15:35:27
-#   Description : keras_yolov4
+#   Created date: 2020-06-10 10:20:27
+#   Description : paddlepaddle_yolov4
 #
 # ================================================================
-import keras.layers as layers
 from tools.cocotools import get_classes
 from model.yolov4 import YOLOv4
 from model.decode_np import Decode
 import json
+import os
+import paddle.fluid as fluid
 from tools.cocotools import test_dev
 
 import logging
@@ -20,11 +21,13 @@ logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
 
 
+use_gpu = True
+
 if __name__ == '__main__':
     classes_path = 'data/coco_classes.txt'
-    # model_path可以是'yolov4.h5'、'./weights/step00001000.h5'这些。
-    # model_path = 'yolov4.h5'
-    model_path = './weights/step00070000.h5'
+    # model_path可以是'yolov4'、'./weights/step00001000'这些。
+    # model_path = 'yolov4'
+    model_path = './weights/step00252000'
 
     # input_shape越大，精度会上升，但速度会下降。
     # input_shape = (320, 320)
@@ -50,10 +53,25 @@ if __name__ == '__main__':
     num_anchors = 3
     all_classes = get_classes(classes_path)
     num_classes = len(all_classes)
-    inputs = layers.Input(shape=(None, None, 3))
-    yolo = YOLOv4(inputs, num_classes, num_anchors)
-    yolo.load_weights(model_path, by_name=True)
 
-    _decode = Decode(conf_thresh, nms_thresh, input_shape, yolo, all_classes)
-    test_dev(_decode, images, test_pre_path, test_batch_size, draw_image)
+
+    train_program = fluid.Program()
+    startup_program = fluid.Program()
+    test_program = None
+    with fluid.program_guard(train_program, startup_program):
+        inputs = fluid.layers.data(name='input_1', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
+        pred_outs = YOLOv4(inputs, num_classes, num_anchors, is_test=True, trainable=False)
+        fetch_list = pred_outs
+
+        # 在使用Optimizer之前，将train_program复制成一个test_program。之后使用测试数据运行test_program，就可以做到运行测试程序，而不影响训练结果。
+        test_program = train_program.clone(for_test=True)
+    gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
+    place = fluid.CUDAPlace(gpu_id) if use_gpu else fluid.CPUPlace()
+    exe = fluid.Executor(place)
+    exe.run(startup_program)
+
+    fluid.io.load_persistables(exe, model_path, main_program=startup_program)
+    _decode = Decode(conf_thresh, nms_thresh, input_shape, exe, test_program, all_classes)
+
+    test_dev(_decode, fetch_list, images, test_pre_path, test_batch_size, draw_image)
 

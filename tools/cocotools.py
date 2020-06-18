@@ -165,7 +165,7 @@ def eval(_decode, eval_fetch_list, images, eval_pre_path, anno_file, eval_batch_
     return box_ap_stats
 
 
-def test_dev(_decode, images, test_pre_path, test_batch_size, draw_image):
+def test_dev(_decode, eval_fetch_list, images, test_pre_path, test_batch_size, draw_image):
     # 8G内存的电脑并不能装下所有结果，所以把结果写进文件里。
     if os.path.exists('results/bbox/'): shutil.rmtree('results/bbox/')
     if draw_image:
@@ -193,7 +193,7 @@ def test_dev(_decode, images, test_pre_path, test_batch_size, draw_image):
         if i != n - 1 and len(batch_img) != test_batch_size:
             continue
 
-        result_image, result_boxes, result_scores, result_classes = _decode.detect_batch(batch_img, draw_image=draw_image)
+        result_image, result_boxes, result_scores, result_classes = _decode.detect_batch(batch_img, eval_fetch_list, draw_image=draw_image)
         k = 0
         for image, boxes, scores, classes in zip(result_image, result_boxes, result_scores, result_classes):
             if boxes is not None:
