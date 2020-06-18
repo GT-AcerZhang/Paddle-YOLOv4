@@ -42,8 +42,8 @@ if __name__ == '__main__':
     test_batch_size = 4
 
     # test集图片的相对路径
-    test_pre_path = '../COCO/test2017/'
-    anno_file = '../COCO/annotations/image_info_test-dev2017.json'
+    test_pre_path = '../data/data7122/test2017/'
+    anno_file = '../data/data7122/annotations/image_info_test-dev2017.json'
     with open(anno_file, 'r', encoding='utf-8') as f2:
         for line in f2:
             line = line.strip()

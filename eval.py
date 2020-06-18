@@ -38,7 +38,7 @@ if __name__ == '__main__':
     classes_path = 'data/coco_classes.txt'
     # model_path可以是'yolov4'、'./weights/step00001000'这些。
     # model_path = 'yolov4'
-    model_path = './weights/step00245000'
+    model_path = './weights/step00252000'
 
     # input_shape越大，精度会上升，但速度会下降。
     # input_shape = (320, 320)
