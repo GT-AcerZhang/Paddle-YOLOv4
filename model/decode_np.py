@@ -49,7 +49,6 @@ class Decode(object):
             pimage = self.process_image(np.copy(image))
             batch.append(pimage)
         batch = np.concatenate(batch, axis=0)
-        # outs = self._yolo.predict(batch)
         outs = self.exe.run(self.program, feed={"input_1": batch, }, fetch_list=fetch_list)
 
         # 多线程

@@ -266,6 +266,29 @@ def get_grid_offset(grid_n):
     grid_offset = np.concatenate([grid_x_offset, grid_y_offset], axis=-1)
     return grid_offset
 
+def clear_model(save_dir):
+    path_dir = os.listdir(save_dir)
+    it_ids = []
+    for name in path_dir:
+        sss = name.split('.')
+        if sss[0] == '':
+            continue
+        if sss[0] == 'best_model':   # 不会删除最优模型
+            it_id = 9999999999
+        else:
+            it_id = int(sss[0])
+        it_ids.append(it_id)
+    if len(it_ids) >= 11 * 3:
+        it_id = min(it_ids)
+        pdopt_path = '%s/%d.pdopt' % (save_dir, it_id)
+        pdmodel_path = '%s/%d.pdmodel' % (save_dir, it_id)
+        pdparams_path = '%s/%d.pdparams' % (save_dir, it_id)
+        if os.path.exists(pdopt_path):
+            os.remove(pdopt_path)
+        if os.path.exists(pdmodel_path):
+            os.remove(pdmodel_path)
+        if os.path.exists(pdparams_path):
+            os.remove(pdparams_path)
 
 if __name__ == '__main__':
     use_gpu = False
@@ -283,56 +306,62 @@ if __name__ == '__main__':
     # 步id，无需设置，会自动读。
     iter_id = 0
 
-    train_program = fluid.Program()
-    startup_program = fluid.Program()
-    test_program = None
-    with fluid.program_guard(train_program, startup_program):
-        # 多尺度训练
-        inputs = P.data(name='input_1', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
-        output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
-        eval_fetch_list = [output_l, output_m, output_s]
+    startup_prog = fluid.Program()
+    train_prog = fluid.Program()
+    with fluid.program_guard(train_prog, startup_prog):
+        with fluid.unique_name.guard():
+            # 多尺度训练
+            inputs = P.data(name='input_1', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
+            output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
 
-        # 建立损失函数
-        label_sbbox = P.data(name='input_2', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False,
-                             dtype='float32')
-        label_mbbox = P.data(name='input_3', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False,
-                             dtype='float32')
-        label_lbbox = P.data(name='input_4', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False,
-                             dtype='float32')
-        true_bboxes = P.data(name='input_5', shape=[cfg.num_max_boxes, 4], dtype='float32')
-        label_sbbox_grid_offset = P.data(name='input_6', shape=[-1, -1, -1, 3, 2], append_batch_size=False,
-                                         dtype='float32')
-        label_mbbox_grid_offset = P.data(name='input_7', shape=[-1, -1, -1, 3, 2], append_batch_size=False,
-                                         dtype='float32')
-        label_lbbox_grid_offset = P.data(name='input_8', shape=[-1, -1, -1, 3, 2], append_batch_size=False,
-                                         dtype='float32')
-        args = [output_l, output_m, output_s, label_sbbox, label_mbbox, label_lbbox, true_bboxes,
-                label_sbbox_grid_offset, label_mbbox_grid_offset, label_lbbox_grid_offset]
-        ciou_loss, conf_loss, prob_loss = yolo_loss(args, num_classes, cfg.iou_loss_thresh, _anchors)
-        loss = ciou_loss + conf_loss + prob_loss
-        # ciou_loss.persistable = True
-        # conf_loss.persistable = True
-        # prob_loss.persistable = True
-        loss.persistable = True
+            # 建立损失函数
+            label_sbbox = P.data(name='input_2', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False,
+                                 dtype='float32')
+            label_mbbox = P.data(name='input_3', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False,
+                                 dtype='float32')
+            label_lbbox = P.data(name='input_4', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False,
+                                 dtype='float32')
+            true_bboxes = P.data(name='input_5', shape=[cfg.num_max_boxes, 4], dtype='float32')
+            label_sbbox_grid_offset = P.data(name='input_6', shape=[-1, -1, -1, 3, 2], append_batch_size=False,
+                                             dtype='float32')
+            label_mbbox_grid_offset = P.data(name='input_7', shape=[-1, -1, -1, 3, 2], append_batch_size=False,
+                                             dtype='float32')
+            label_lbbox_grid_offset = P.data(name='input_8', shape=[-1, -1, -1, 3, 2], append_batch_size=False,
+                                             dtype='float32')
+            args = [output_l, output_m, output_s, label_sbbox, label_mbbox, label_lbbox, true_bboxes,
+                    label_sbbox_grid_offset, label_mbbox_grid_offset, label_lbbox_grid_offset]
+            ciou_loss, conf_loss, prob_loss = yolo_loss(args, num_classes, cfg.iou_loss_thresh, _anchors)
+            loss = ciou_loss + conf_loss + prob_loss
 
-        # 在使用Optimizer之前，将train_program复制成一个test_program。之后使用测试数据运行test_program，就可以做到运行测试程序，而不影响训练结果。
-        test_program = train_program.clone(for_test=True)
+            optimizer = fluid.optimizer.Adam(learning_rate=cfg.lr)
+            optimizer.minimize(loss)
 
-        optimizer = fluid.optimizer.Adam(learning_rate=cfg.lr)
-        optimizer.minimize(loss)
+
+    eval_prog = fluid.Program()
+    with fluid.program_guard(eval_prog, startup_prog):
+        with fluid.unique_name.guard():
+            # 多尺度训练
+            inputs = P.data(name='input_1', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
+            output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
+            eval_fetch_list = [output_l, output_m, output_s]
+    eval_prog = eval_prog.clone(for_test=True)
 
     # 参数随机初始化
     gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
     place = fluid.CUDAPlace(gpu_id) if use_gpu else fluid.CPUPlace()
     exe = fluid.Executor(place)
-    exe.run(startup_program)
+    exe.run(startup_prog)
+
+    compiled_eval_prog = fluid.compiler.CompiledProgram(eval_prog)
+    _decode = Decode(cfg.conf_thresh, cfg.nms_thresh, cfg.input_shape, exe, compiled_eval_prog, class_names)
 
     if cfg.pattern == 1:
-        fluid.io.load_params(exe, cfg.model_path, main_program=startup_program)
-        strs = cfg.model_path.split('step')
+        strs = cfg.model_path.split('weights/')
         if len(strs) == 2:
+            fluid.load(train_prog, cfg.model_path, executor=exe)
             iter_id = int(strs[1])
-    _decode = Decode(cfg.conf_thresh, cfg.nms_thresh, cfg.input_shape, exe, test_program, class_names)
+        else:
+            fluid.io.load_params(exe, cfg.model_path, main_program=startup_prog)
 
     # 种类id
     _catid2clsid = copy.deepcopy(catid2clsid)
@@ -445,7 +474,7 @@ if __name__ == '__main__':
             batch_label_mbbox_grid_offset = batch_label_mbbox_grid_offset.astype(np.float32)
             batch_label_sbbox_grid_offset = batch_label_sbbox_grid_offset.astype(np.float32)
 
-            losses = exe.run(train_program, feed={"input_1": batch_image, "input_2": batch_label[2],
+            losses = exe.run(train_prog, feed={"input_1": batch_image, "input_2": batch_label[2],
                                                   "input_3": batch_label[1], "input_4": batch_label[0],
                                                   "input_5": batch_gt_bbox, "input_6": batch_label_sbbox_grid_offset,
                                                   "input_7": batch_label_mbbox_grid_offset,
@@ -460,23 +489,13 @@ if __name__ == '__main__':
 
             # ==================== save ====================
             if iter_id % cfg.save_iter == 0:
-                save_path = './weights/step%.8d' % iter_id
-                fluid.io.save_persistables(exe, save_path, train_program)
-                path_dir = os.listdir('./weights')
-                steps = []
-                names = []
-                for name in path_dir:
-                    if name[0:4] == 'step':
-                        step = int(name[4:12])
-                        steps.append(step)
-                        names.append(name)
-                if len(steps) > 10:
-                    i = steps.index(min(steps))
-                    shutil.rmtree('./weights/' + names[i])
+                save_path = './weights/%d' % iter_id
+                fluid.save(train_prog, save_path)
                 logger.info('Save model to {}'.format(save_path))
+                clear_model('weights')
 
             # ==================== eval ====================
-            '''if iter_id % cfg.eval_iter == 0:
+            if iter_id % cfg.eval_iter == 0:
                 box_ap = eval(_decode, eval_fetch_list, val_images, cfg.val_pre_path, cfg.val_path, cfg.eval_batch_size,
                               _clsid2catid, cfg.draw_image)
                 logger.info("box ap: %.3f" % (box_ap[0],))
@@ -486,9 +505,12 @@ if __name__ == '__main__':
                 if ap[0] > best_ap_list[0]:
                     best_ap_list[0] = ap[0]
                     best_ap_list[1] = iter_id
-                    fluid.io.save_persistables(exe, './weights/best_model', train_program)
+                    save_path = './weights/best_model'
+                    fluid.save(train_prog, save_path)
+                    logger.info('Save model to {}'.format(save_path))
+                    clear_model('weights')
                 logger.info("Best test ap: {}, in iter: {}".format(
-                    best_ap_list[0], best_ap_list[1]))'''
+                    best_ap_list[0], best_ap_list[1]))
 
             # ==================== exit ====================
             if iter_id == cfg.max_iters:
