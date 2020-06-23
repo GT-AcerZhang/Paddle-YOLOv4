@@ -14,6 +14,7 @@ import os
 import time
 import numpy as np
 import paddle.fluid as fluid
+import paddle.fluid.layers as P
 from tools.cocotools import get_classes
 from model.yolov4 import YOLOv4
 from model.decode_np import Decode
@@ -33,9 +34,9 @@ use_gpu = True
 if __name__ == '__main__':
     # classes_path = 'data/voc_classes.txt'
     classes_path = 'data/coco_classes.txt'
-    # model_path可以是'yolov4'、'./weights/step00001000'这些。
-    # model_path = 'yolov4'
-    model_path = './weights/step00061000'
+    # model_path可以是'yolov4'、'./weights/1000'这些。
+    model_path = 'yolov4'
+    # model_path = './weights/1000'
 
     # input_shape越大，精度会上升，但速度会下降。
     # input_shape = (320, 320)
@@ -56,24 +57,22 @@ if __name__ == '__main__':
     num_classes = len(all_classes)
 
 
-
-    train_program = fluid.Program()
-    startup_program = fluid.Program()
-    test_program = None
-    with fluid.program_guard(train_program, startup_program):
-        inputs = fluid.layers.data(name='input_1', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
-        pred_outs = YOLOv4(inputs, num_classes, num_anchors, is_test=True, trainable=False)
-        fetch_list = pred_outs
-
-        # 在使用Optimizer之前，将train_program复制成一个test_program。之后使用测试数据运行test_program，就可以做到运行测试程序，而不影响训练结果。
-        test_program = train_program.clone(for_test=True)
+    startup_prog = fluid.Program()
+    eval_prog = fluid.Program()
+    with fluid.program_guard(eval_prog, startup_prog):
+        with fluid.unique_name.guard():
+            # 多尺度训练
+            inputs = P.data(name='input_1', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
+            output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
+            eval_fetch_list = [output_l, output_m, output_s]
+    eval_prog = eval_prog.clone(for_test=True)
     gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
     place = fluid.CUDAPlace(gpu_id) if use_gpu else fluid.CPUPlace()
     exe = fluid.Executor(place)
-    exe.run(startup_program)
+    exe.run(startup_prog)
 
-    fluid.io.load_persistables(exe, model_path, main_program=startup_program)
-    _decode = Decode(conf_thresh, nms_thresh, input_shape, exe, test_program, all_classes)
+    fluid.load(eval_prog, model_path, executor=exe)
+    _decode = Decode(conf_thresh, nms_thresh, input_shape, exe, eval_prog, all_classes)
 
 
     path_dir = os.listdir('images/test')
@@ -81,7 +80,7 @@ if __name__ == '__main__':
     if use_gpu:
         for k, filename in enumerate(path_dir):
             image = cv2.imread('images/test/' + filename)
-            image, boxes, scores, classes = _decode.detect_image(image, fetch_list, draw_image=False)
+            image, boxes, scores, classes = _decode.detect_image(image, eval_fetch_list, draw_image=False)
             if k == 10:
                 break
 
@@ -93,7 +92,7 @@ if __name__ == '__main__':
     start = time.time()
     for k, filename in enumerate(path_dir):
         image = cv2.imread('images/test/' + filename)
-        image, boxes, scores, classes = _decode.detect_image(image, fetch_list, draw_image)
+        image, boxes, scores, classes = _decode.detect_image(image, eval_fetch_list, draw_image)
 
         # 估计剩余时间
         start_time = end_time

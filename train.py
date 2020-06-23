@@ -356,12 +356,10 @@ if __name__ == '__main__':
     _decode = Decode(cfg.conf_thresh, cfg.nms_thresh, cfg.input_shape, exe, compiled_eval_prog, class_names)
 
     if cfg.pattern == 1:
+        fluid.load(train_prog, cfg.model_path, executor=exe)
         strs = cfg.model_path.split('weights/')
         if len(strs) == 2:
-            fluid.load(train_prog, cfg.model_path, executor=exe)
             iter_id = int(strs[1])
-        else:
-            fluid.io.load_params(exe, cfg.model_path, main_program=startup_prog)
 
     # 种类id
     _catid2clsid = copy.deepcopy(catid2clsid)
