@@ -101,12 +101,12 @@ def _spp(x):
 
 
 # 对坐标解码
-def decode(conv_output, anchors, stride, num_class):
+'''def decode(conv_output, anchors, stride, num_class):
     conv_shape       = P.shape(conv_output)
     batch_size       = conv_shape[0]
     output_size      = conv_shape[1]
     anchor_per_scale = len(anchors)
-    conv_output = tf.reshape(conv_output, (batch_size, output_size, output_size, anchor_per_scale, 5 + num_class))
+    conv_output = P.reshape(conv_output, (batch_size, output_size, output_size, anchor_per_scale, 5 + num_class))
     conv_raw_dxdy = conv_output[:, :, :, :, 0:2]
     conv_raw_dwdh = conv_output[:, :, :, :, 2:4]
     conv_raw_conf = conv_output[:, :, :, :, 4:5]
@@ -125,7 +125,7 @@ def decode(conv_output, anchors, stride, num_class):
     pred_xywh = tf.reshape(pred_xywh, (batch_size, -1, 4))  # [-1, -1, 4]
     pred_conf = tf.reshape(pred_conf, (batch_size, -1, 1))  # [-1, -1, 1]
     pred_prob = tf.reshape(pred_prob, (batch_size, -1, num_class))  # [-1, -1, 80]
-    return pred_xywh, pred_conf, pred_prob
+    return pred_xywh, pred_conf, pred_prob'''
 
 
 
