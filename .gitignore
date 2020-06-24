@@ -8,6 +8,7 @@
 __pycache__/
 .ipynb_checkpoints/
 
+/images/res
 /images/res/
 /images/res/*.jpg
 /eval_results/
