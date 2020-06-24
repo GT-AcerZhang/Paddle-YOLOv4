@@ -106,7 +106,7 @@ rm -f train.txt
 nohup python train.py>> train.txt 2>&1 &
 ```
 通过修改config.py代码来进行更换数据集、更改超参数以及训练参数。
-暂时需要手动python eval.py跑验证集，可以一边训练一边跑eval.py，32GB显存够的。
+训练时默认每5000步计算一次验证集的mAP。
 
 训练时如果发现mAP很稳定了，就停掉，修改学习率为原来的十分之一，接着继续训练，mAP还会再上升。暂时是这样手动操作。
 
@@ -124,7 +124,7 @@ xxx.jpg 48,240,195,371,11 8,12,352,498,14
 如果需要跑demo.py、eval.py，与数据集有关的变量也需要修改一下，应该很容易看懂。
 
 ## 评估
-暂时需要手动python eval.py跑验证集，可以一边训练一边跑eval.py，32GB显存够的。该mAP是val集的结果。
+训练时默认每5000步计算一次验证集的mAP。或者运行eval.py评估指定模型的mAP。该mAP是val集的结果。
 
 ## test-dev
 运行test_dev.py。
