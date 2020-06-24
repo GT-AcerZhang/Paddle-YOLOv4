@@ -37,6 +37,8 @@ Paddle版SOLO: https://github.com/miemie2013/Paddle-SOLO
 2020/06/18:经过验证，Paddle镜像版YOLOv4：https://github.com/miemie2013/Paddle-YOLOv4
 ，可以刷到43.4mAP（不冻结任何层的情况下），赶紧star我的Paddle版YOLOv4，去AIStudio抢显卡训练吧！
 
+2020/06/25:支持yolact中的fastnms。运行demo_fast.py即可体验。
+
 ## 需要补充
 
 加入YOLOv4中的数据增强和其余的tricks；更多调优。

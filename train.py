@@ -190,20 +190,28 @@ def loss_layer(conv, pred, label, bboxes, stride, num_class, iou_loss_thresh):
     return ciou_loss, conf_loss, prob_loss
 
 
-def decode(conv_output, anchors, stride, num_class, grid_offset):
+def decode(conv_output, anchors, stride, num_class):
     conv_shape = P.shape(conv_output)
     batch_size = conv_shape[0]
-    output_size = conv_shape[1]
+    n_grid = conv_shape[1]
     anchor_per_scale = len(anchors)
 
-    conv_output = P.reshape(conv_output, (batch_size, output_size, output_size, anchor_per_scale, 5 + num_class))
+    conv_output = P.reshape(conv_output, (batch_size, n_grid, n_grid, anchor_per_scale, 5 + num_class))
 
     conv_raw_dxdy = conv_output[:, :, :, :, 0:2]
     conv_raw_dwdh = conv_output[:, :, :, :, 2:4]
     conv_raw_conf = conv_output[:, :, :, :, 4:5]
     conv_raw_prob = conv_output[:, :, :, :, 5:]
 
-    pred_xy = (P.sigmoid(conv_raw_dxdy) + grid_offset) * stride
+    rows = P.range(0, n_grid, 1, 'float32')
+    cols = P.range(0, n_grid, 1, 'float32')
+    rows = P.expand(P.reshape(rows, (1, -1, 1)), [n_grid, 1, 1])
+    cols = P.expand(P.reshape(cols, (-1, 1, 1)), [1, n_grid, 1])
+    offset = P.concat([rows, cols], axis=-1)
+    offset = P.reshape(offset, (1, n_grid, n_grid, 1, 2))
+    offset = P.expand(offset, [batch_size, 1, 1, anchor_per_scale, 1])
+
+    pred_xy = (P.sigmoid(conv_raw_dxdy) + offset) * stride
     anchor_t = fluid.layers.assign(np.copy(anchors).astype(np.float32))
     pred_wh = (P.exp(conv_raw_dwdh) * anchor_t)
     pred_xywh = P.concat([pred_xy, pred_wh], axis=-1)
@@ -222,12 +230,9 @@ def yolo_loss(args, num_classes, iou_loss_thresh, anchors):
     label_mbbox = args[4]  # (?, ?, ?, 3, num_classes+5)
     label_lbbox = args[5]  # (?, ?, ?, 3, num_classes+5)
     true_bboxes = args[6]  # (?, 70, 4)
-    label_sbbox_grid_offset = args[7]  # (?, ?, ?, 3, 2)
-    label_mbbox_grid_offset = args[8]  # (?, ?, ?, 3, 2)
-    label_lbbox_grid_offset = args[9]  # (?, ?, ?, 3, 2)
-    pred_sbbox = decode(conv_sbbox, anchors[0], 8, num_classes, label_sbbox_grid_offset)
-    pred_mbbox = decode(conv_mbbox, anchors[1], 16, num_classes, label_mbbox_grid_offset)
-    pred_lbbox = decode(conv_lbbox, anchors[2], 32, num_classes, label_lbbox_grid_offset)
+    pred_sbbox = decode(conv_sbbox, anchors[0], 8, num_classes)
+    pred_mbbox = decode(conv_mbbox, anchors[1], 16, num_classes)
+    pred_lbbox = decode(conv_lbbox, anchors[2], 32, num_classes)
     sbbox_ciou_loss, sbbox_conf_loss, sbbox_prob_loss = loss_layer(conv_sbbox, pred_sbbox, label_sbbox, true_bboxes, 8,
                                                                    num_classes, iou_loss_thresh)
     mbbox_ciou_loss, mbbox_conf_loss, mbbox_prob_loss = loss_layer(conv_mbbox, pred_mbbox, label_mbbox, true_bboxes, 16,
@@ -252,19 +257,6 @@ def multi_thread_op(i, samples, decodeImage, context, train_dataset, with_mixup,
     samples[i] = normalizeBox(samples[i], context)
     samples[i] = padBox(samples[i], context)
     samples[i] = bboxXYXY2XYWH(samples[i], context)
-
-
-def get_grid_offset(grid_n):
-    grid_offset = np.arange(grid_n)
-    grid_x_offset = np.tile(grid_offset, (grid_n, 1))
-    grid_y_offset = np.copy(grid_x_offset)
-    grid_y_offset = grid_y_offset.transpose(1, 0)
-    grid_x_offset = np.reshape(grid_x_offset, (grid_n, grid_n, 1, 1))
-    grid_x_offset = np.tile(grid_x_offset, (1, 1, 3, 1))
-    grid_y_offset = np.reshape(grid_y_offset, (grid_n, grid_n, 1, 1))
-    grid_y_offset = np.tile(grid_y_offset, (1, 1, 3, 1))
-    grid_offset = np.concatenate([grid_x_offset, grid_y_offset], axis=-1)
-    return grid_offset
 
 def clear_model(save_dir):
     path_dir = os.listdir(save_dir)
@@ -315,21 +307,11 @@ if __name__ == '__main__':
             output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
 
             # 建立损失函数
-            label_sbbox = P.data(name='input_2', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False,
-                                 dtype='float32')
-            label_mbbox = P.data(name='input_3', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False,
-                                 dtype='float32')
-            label_lbbox = P.data(name='input_4', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False,
-                                 dtype='float32')
+            label_sbbox = P.data(name='input_2', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False, dtype='float32')
+            label_mbbox = P.data(name='input_3', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False, dtype='float32')
+            label_lbbox = P.data(name='input_4', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False, dtype='float32')
             true_bboxes = P.data(name='input_5', shape=[cfg.num_max_boxes, 4], dtype='float32')
-            label_sbbox_grid_offset = P.data(name='input_6', shape=[-1, -1, -1, 3, 2], append_batch_size=False,
-                                             dtype='float32')
-            label_mbbox_grid_offset = P.data(name='input_7', shape=[-1, -1, -1, 3, 2], append_batch_size=False,
-                                             dtype='float32')
-            label_lbbox_grid_offset = P.data(name='input_8', shape=[-1, -1, -1, 3, 2], append_batch_size=False,
-                                             dtype='float32')
-            args = [output_l, output_m, output_s, label_sbbox, label_mbbox, label_lbbox, true_bboxes,
-                    label_sbbox_grid_offset, label_mbbox_grid_offset, label_lbbox_grid_offset]
+            args = [output_l, output_m, output_s, label_sbbox, label_mbbox, label_lbbox, true_bboxes]
             ciou_loss, conf_loss, prob_loss = yolo_loss(args, num_classes, cfg.iou_loss_thresh, _anchors)
             loss = ciou_loss + conf_loss + prob_loss
 
@@ -447,16 +429,6 @@ if __name__ == '__main__':
             samples = randomShape(samples, context)
             samples = normalizeImage(samples, context)
             batch_image, batch_label, batch_gt_bbox = gt2YoloTarget(samples, context)
-            # 网格偏移
-            label_lbbox_grid_offset_arr = get_grid_offset(batch_label[0].shape[1])
-            label_mbbox_grid_offset_arr = get_grid_offset(batch_label[1].shape[1])
-            label_sbbox_grid_offset_arr = get_grid_offset(batch_label[2].shape[1])
-            label_lbbox_grid_offset_arr = np.expand_dims(label_lbbox_grid_offset_arr, axis=0)
-            label_mbbox_grid_offset_arr = np.expand_dims(label_mbbox_grid_offset_arr, axis=0)
-            label_sbbox_grid_offset_arr = np.expand_dims(label_sbbox_grid_offset_arr, axis=0)
-            batch_label_lbbox_grid_offset = np.tile(label_lbbox_grid_offset_arr, (batch_size, 1, 1, 1, 1))
-            batch_label_mbbox_grid_offset = np.tile(label_mbbox_grid_offset_arr, (batch_size, 1, 1, 1, 1))
-            batch_label_sbbox_grid_offset = np.tile(label_sbbox_grid_offset_arr, (batch_size, 1, 1, 1, 1))
 
             # 一些变换
             batch_image = batch_image.transpose(0, 3, 1, 2)
@@ -468,15 +440,9 @@ if __name__ == '__main__':
 
             batch_gt_bbox = batch_gt_bbox.astype(np.float32)
 
-            batch_label_lbbox_grid_offset = batch_label_lbbox_grid_offset.astype(np.float32)
-            batch_label_mbbox_grid_offset = batch_label_mbbox_grid_offset.astype(np.float32)
-            batch_label_sbbox_grid_offset = batch_label_sbbox_grid_offset.astype(np.float32)
-
             losses = exe.run(train_prog, feed={"input_1": batch_image, "input_2": batch_label[2],
                                                   "input_3": batch_label[1], "input_4": batch_label[0],
-                                                  "input_5": batch_gt_bbox, "input_6": batch_label_sbbox_grid_offset,
-                                                  "input_7": batch_label_mbbox_grid_offset,
-                                                  "input_8": batch_label_lbbox_grid_offset},
+                                                  "input_5": batch_gt_bbox, },
                              fetch_list=[loss, ciou_loss, conf_loss, prob_loss])
 
             # ==================== log ====================
