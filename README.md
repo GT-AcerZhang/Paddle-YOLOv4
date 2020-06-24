@@ -10,7 +10,7 @@ Paddle-YOLOv4,参考自https://github.com/miemie2013/Keras-YOLOv4
 本项目已经开源到AIStudio中，可直接跑：
 https://aistudio.baidu.com/aistudio/projectdetail/570310
 
-## 传送门
+## 咩酱刷屏时刻
 
 Keras版YOLOv3: https://github.com/miemie2013/Keras-DIOU-YOLOv3
 
@@ -27,6 +27,10 @@ Keras版YOLOv4: https://github.com/miemie2013/Keras-YOLOv4
 Pytorch版YOLOv4: 制作中
 
 Paddle版YOLOv4：https://github.com/miemie2013/Paddle-YOLOv4
+
+Keras版SOLO: https://github.com/miemie2013/Keras-SOLO
+
+Paddle版SOLO: https://github.com/miemie2013/Paddle-SOLO
 
 ## 更新日记
 
