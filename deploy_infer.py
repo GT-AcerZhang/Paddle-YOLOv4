@@ -594,7 +594,7 @@ def predict_video():
             break
         print('detect frame:%d' % (index))
         index += 1
-        results = detector.predict(frame, FLAGS.threshold)
+        results = detector.predict(frame, FLAGS.threshold, warmup=0, repeats=1)
         im = visualize_box_mask(
             frame,
             results,

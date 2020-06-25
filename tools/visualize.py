@@ -45,7 +45,8 @@ def visualize_box_mask(im, results, labels, mask_resolution=14):
             labels,
             resolution=mask_resolution)
     if 'boxes' in results:
-        im = draw_box(im, results['boxes'], results['scores'], results['classes'], labels)
+        if len(results['boxes']) > 0:
+            im = draw_box(im, results['boxes'], results['scores'], results['classes'], labels)
     return im
 
 

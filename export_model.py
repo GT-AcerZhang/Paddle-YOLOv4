@@ -87,12 +87,7 @@ def prune_feed_vars(feeded_var_names, target_vars, prog):
     return exist_var_names
 
 def save_infer_model(save_dir, exe, feed_vars, test_fetches, infer_prog):
-    # cfg_name = os.path.basename(FLAGS.config).split('.')[0]
-    # save_dir = os.path.join(FLAGS.output_dir, cfg_name)
-    cfg_name = 'aaaaaaaaaaaa'
-
     feed_var_names = [var.name for var in feed_vars.values()]
-    print()
     fetch_list = sorted(test_fetches.items(), key=lambda i: i[0])
     target_vars = [var[1] for var in fetch_list]
     feed_var_names = prune_feed_vars(feed_var_names, target_vars, infer_prog)
@@ -108,30 +103,34 @@ def save_infer_model(save_dir, exe, feed_vars, test_fetches, infer_prog):
         params_filename="__params__")
 
 
+def dump_infer_config(save_dir):
+    shutil.copy('tools/template_cfg.yml', '%s/infer_cfg.yml' % save_dir)
+
+
 if __name__ == '__main__':
     # classes_path = 'data/voc_classes.txt'
     classes_path = 'data/coco_classes.txt'
+    # 导出哪个模型
     model_path = './weights/1'
 
-    # input_shape越大，精度会上升，但速度会下降。
+    # 推理模型输入图片大小。input_shape越大，精度会上升，但速度会下降。
     # input_shape = (320, 320)
     input_shape = (416, 416)
     # input_shape = (608, 608)
 
+    # 推理模型保存目录
     save_dir = 'inference_model'
 
-    # 验证时的分数阈值和nms_iou阈值
+    # 推理时的分数阈值和nms_iou阈值。注意，该值会写死进模型，如需修改请重新导出模型。
     conf_thresh = 0.05
     nms_thresh = 0.45
     keep_top_k = 100
     nms_top_k = 100
 
-    # 是否给图片画框。不画可以提速。读图片、后处理还可以继续优化。
-    draw_image = True
-    # draw_image = False
 
     # 初始卷积核个数
     initial_filters = 32
+    # 先验框
     anchors = np.array([
         [[12, 16], [19, 36], [40, 28]],
         [[36, 75], [76, 55], [72, 146]],
@@ -168,6 +167,6 @@ if __name__ == '__main__':
     load_params(exe, infer_prog, model_path)
 
     save_infer_model(save_dir, exe, feed_vars, test_fetches, infer_prog)
-    # dump_infer_config(FLAGS, cfg)
+    dump_infer_config(save_dir)
 
 

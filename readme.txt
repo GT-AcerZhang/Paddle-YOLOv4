@@ -54,6 +54,10 @@ python deploy_infer.py --model_dir inference_model --image_file images/test/0000
 
 
 
+python deploy_infer.py --model_dir inference_model --video_file D://PycharmProjects/moviepy/disco.mp4
+
+
+
 
 
 
