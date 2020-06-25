@@ -254,8 +254,11 @@ def create_inputs(im, im_info, model_arch='YOLO'):
     resize_shape = list(im_info['resize_shape'])
     scale = im_info['scale']
     if 'YOLO' in model_arch:
+        # 要先是w再h
         origin_shape = np.array([origin_shape]).astype('int32')
         resize_shape = np.array([resize_shape]).astype('int32')
+        origin_shape = origin_shape[:, [1, 0]]
+        resize_shape = resize_shape[:, [1, 0]]
         inputs['origin_shape'] = origin_shape
         inputs['resize_shape'] = resize_shape
     elif 'RetinaNet' in model_arch:
