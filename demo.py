@@ -74,6 +74,8 @@ if __name__ == '__main__':
     fluid.load(eval_prog, model_path, executor=exe)
     _decode = Decode(conf_thresh, nms_thresh, input_shape, exe, eval_prog, all_classes)
 
+    if not os.path.exists('images/res/'): os.mkdir('images/res/')
+
 
     path_dir = os.listdir('images/test')
     # warm up
