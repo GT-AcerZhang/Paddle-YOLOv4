@@ -16,6 +16,10 @@ __pycache__/
 /model/__pycache__/
 
 
+/inference_model/
+/output/
+
+
 yolov4.pt
 /yolov4/
 

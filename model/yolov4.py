@@ -136,7 +136,7 @@ def decode(conv_output, anchors, stride, num_class):
 
 
 def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, trainable=True,
-           fast=False, input_size=None, im_size=None, anchors=None, conf_thresh=0.05, nms_thresh=0.45, keep_top_k=100, nms_top_k=100):
+           fast=False, resize_shape=None, origin_shape=None, anchors=None, conf_thresh=0.05, nms_thresh=0.45, keep_top_k=100, nms_top_k=100):
     i32 = initial_filters
     i64 = i32 * 2
     i128 = i32 * 4
@@ -279,8 +279,8 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
         all_pred_scores = P.concat([pred_score_s, pred_score_m, pred_score_l], axis=1)   # [batch_size, -1, 80]
 
         # 用fastnms
-        output = fastnms(all_pred_boxes, all_pred_scores, input_size, im_size, conf_thresh, nms_thresh, keep_top_k, nms_top_k)
-        return output
+        boxes, scores, classes = fastnms(all_pred_boxes, all_pred_scores, resize_shape, origin_shape, conf_thresh, nms_thresh, keep_top_k, nms_top_k)
+        return boxes, scores, classes
     return output_l, output_m, output_s
 
 

@@ -102,12 +102,12 @@ def fast_nms(boxes, scores, conf_thresh, nms_thresh, keep_top_k, nms_top_k):
 
     return boxes, scores, classes
 
-def fastnms(all_pred_boxes, all_pred_scores, input_size, im_size, conf_thresh, nms_thresh, keep_top_k, nms_top_k):
+def fastnms(all_pred_boxes, all_pred_scores, resize_shape, origin_shape, conf_thresh, nms_thresh, keep_top_k, nms_top_k):
     '''
     :param all_pred_boxes:      [batch_size, -1, 4]
     :param all_pred_scores:     [batch_size, -1, 80]
-    :param input_size:          [batch_size, 2]
-    :param im_size:             [batch_size, 2]
+    :param resize_shape:        [batch_size, 2]
+    :param origin_shape:        [batch_size, 2]
     '''
     conf_preds = P.transpose(all_pred_scores, perm=[0, 2, 1])  # [1, 80, -1]
     cur_scores = conf_preds[0]  # [80, -1]
@@ -154,13 +154,15 @@ def fastnms(all_pred_boxes, all_pred_scores, input_size, im_size, conf_thresh, n
                       boxes[:, :2] + boxes[:, 2:] * 0.5], axis=-1)
 
     # 缩放到原图大小
-    scale = im_size / input_size
+    resize_shape_f = P.cast(resize_shape, 'float32')
+    origin_shape_f = P.cast(origin_shape, 'float32')
+    scale = origin_shape_f / resize_shape_f
     scale = P.expand(scale, [1, 2])
     boxes *= scale   # 批大小是1才支持这么做，因为scale第0维表示批大小，boxes第0维却表示这张图片预测出的物体数
 
     # 批大小在前
-    boxes = P.reshape(boxes, (1, -1, 4))
-    scores = P.reshape(scores, (1, -1))
-    classes = P.reshape(classes, (1, -1))
+    boxes = P.reshape(boxes, (1, -1, 4), name='boxes')
+    scores = P.reshape(scores, (1, -1), name='scores')
+    classes = P.reshape(classes, (1, -1), name='classes')
     return [boxes, scores, classes]
 

@@ -44,8 +44,13 @@ nohup python test_dev.py>> test_dev.txt 2>&1 &
 
 
 
+--------------------------导出--------------------------
+python export_model.py
 
 
+
+
+python deploy_infer.py --model_dir inference_model --image_file images/test/000000013659.jpg
 
 
 

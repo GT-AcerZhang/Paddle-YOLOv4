@@ -65,7 +65,7 @@ if __name__ == '__main__':
     classes_path = 'data/coco_classes.txt'
     # model_path可以是'yolov4'、'./weights/1000'这些。
     model_path = 'yolov4'
-    # model_path = './weights/2000'
+    model_path = './weights/2000'
 
     # input_shape越大，精度会上升，但速度会下降。
     # input_shape = (320, 320)
@@ -101,12 +101,11 @@ if __name__ == '__main__':
     eval_prog = fluid.Program()
     with fluid.program_guard(eval_prog, startup_prog):
         with fluid.unique_name.guard():
-            # 多尺度训练
-            inputs = P.data(name='input_1', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
-            input_size = P.data(name='input_size', shape=[-1, 2], append_batch_size=False, dtype='float32')
-            im_size = P.data(name='im_size', shape=[-1, 2], append_batch_size=False, dtype='float32')
-            eval_fetch_list = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, fast=True, input_size=input_size, im_size=im_size,
-                                                  anchors=anchors, conf_thresh=conf_thresh, nms_thresh=nms_thresh, keep_top_k=keep_top_k, nms_top_k=nms_top_k)
+            inputs = P.data(name='image', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
+            resize_shape = P.data(name='resize_shape', shape=[-1, 2], append_batch_size=False, dtype='int32')
+            origin_shape = P.data(name='origin_shape', shape=[-1, 2], append_batch_size=False, dtype='int32')
+            eval_fetch_list = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, fast=True, resize_shape=resize_shape, origin_shape=origin_shape,
+                                     anchors=anchors, conf_thresh=conf_thresh, nms_thresh=nms_thresh, keep_top_k=keep_top_k, nms_top_k=nms_top_k)
     eval_prog = eval_prog.clone(for_test=True)
     gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
     place = fluid.CUDAPlace(gpu_id) if use_gpu else fluid.CPUPlace()
@@ -135,10 +134,10 @@ if __name__ == '__main__':
             pimage = process_image(np.copy(image), input_shape)
             pimage = pimage.transpose(0, 3, 1, 2)
             _, _, ih, iw = pimage.shape
-            _input_size = np.array([[iw, ih]], np.float32)
-            _im_size = np.array([[ori_w, ori_h]], np.float32)
+            _resize_shape = np.array([[iw, ih]], np.float32)
+            _origin_shape = np.array([[ori_w, ori_h]], np.float32)
 
-            outs = exe.run(eval_prog, feed={"input_1": pimage, "input_size": _input_size, "im_size": _im_size, }, fetch_list=eval_fetch_list)
+            outs = exe.run(eval_prog, feed={"image": pimage, "resize_shape": _resize_shape, "origin_shape": _origin_shape, }, fetch_list=eval_fetch_list)
             if k == 10:
                 break
 
@@ -154,10 +153,12 @@ if __name__ == '__main__':
         pimage = process_image(np.copy(image), input_shape)
         pimage = pimage.transpose(0, 3, 1, 2)
         _, _, ih, iw = pimage.shape
-        _input_size = np.array([[iw, ih]], np.float32)
-        _im_size = np.array([[ori_w, ori_h]], np.float32)
+        _resize_shape = np.array([[iw, ih]], np.float32)
+        _origin_shape = np.array([[ori_w, ori_h]], np.float32)
 
-        outs = exe.run(eval_prog, feed={"input_1": pimage, "input_size": _input_size, "im_size": _im_size, }, fetch_list=eval_fetch_list)
+        outs = exe.run(eval_prog,
+                       feed={"image": pimage, "resize_shape": _resize_shape, "origin_shape": _origin_shape, },
+                       fetch_list=eval_fetch_list)
         boxes, scores, classes = outs[0][0], outs[1][0], outs[2][0]
 
         # 后处理那里，一定不会返回空。若没有物体，scores[0]会是负数，由此来判断有没有物体。
