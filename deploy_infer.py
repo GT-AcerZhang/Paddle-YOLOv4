@@ -289,6 +289,8 @@ class Config():
         self.preprocess_infos = yml_conf['Preprocess']
         self.use_python_inference = yml_conf['use_python_inference']
         self.min_subgraph_size = yml_conf['min_subgraph_size']
+        self.mode = yml_conf['mode']
+        self.draw_threshold = yml_conf['draw_threshold']
         self.labels = yml_conf['label_list']
         self.mask_resolution = None
         if 'mask_resolution' in yml_conf:
@@ -310,7 +312,10 @@ class Config():
     def print_config(self):
         print('-----------  Model Configuration -----------')
         print('%s: %s' % ('Model Arch', self.arch))
-        print('%s: %s' % ('Use Padddle Executor', self.use_python_inference))
+        print('%s: %s' % ('Use Paddle Executor', self.use_python_inference))
+        print('%s: %d' % ('min_subgraph_size', self.min_subgraph_size))
+        print('%s: %s' % ('mode', self.mode))
+        print('%s: %f' % ('draw_threshold', self.draw_threshold))
         print('%s: ' % ('Transform Order'))
         for op_info in self.preprocess_infos:
             print('--%s: %s' % ('transform op', op_info['type']))
@@ -412,10 +417,10 @@ class Detector():
 
     def __init__(self,
                  model_dir,
+                 config,
                  use_gpu=False,
-                 run_mode='fluid',
-                 threshold=-1.0):
-        self.config = Config(model_dir)
+                 run_mode='fluid'):
+        self.config = config
         if self.config.use_python_inference:
             self.executor, self.program, self.fecth_targets = load_executor(
                 model_dir, use_gpu=use_gpu)
@@ -547,7 +552,6 @@ class Detector():
             cost = (t2 - t1)
             print('warmup: %d' % warmup)
             print('repeats: %d' % repeats)
-            print('cost: %.6fs' % cost)
             print('Speed: %.6fs per image,  %.1f FPS.'%((cost / repeats), (repeats / cost)))
         # 后处理那里，一定不会返回空。若没有物体，scores[0]会是负数，由此来判断有没有物体。
         if scores[0] < 0:
@@ -559,13 +563,14 @@ class Detector():
 
 
 def predict_image():
+    config = Config(FLAGS.model_dir)
     detector = Detector(
-        FLAGS.model_dir, use_gpu=FLAGS.use_gpu, run_mode=FLAGS.run_mode)
+        FLAGS.model_dir, config, use_gpu=FLAGS.use_gpu, run_mode=config.mode)
     if FLAGS.run_benchmark:
         detector.predict(
-            FLAGS.image_file, FLAGS.threshold, warmup=100, repeats=100)
+            FLAGS.image_file, detector.config.draw_threshold, warmup=100, repeats=100)
     else:
-        results = detector.predict(FLAGS.image_file, FLAGS.threshold)
+        results = detector.predict(FLAGS.image_file, detector.config.draw_threshold)
         visualize(
             FLAGS.image_file,
             results,
@@ -575,8 +580,9 @@ def predict_image():
 
 
 def predict_video():
+    config = Config(FLAGS.model_dir)
     detector = Detector(
-        FLAGS.model_dir, use_gpu=FLAGS.use_gpu, run_mode=FLAGS.run_mode)
+        FLAGS.model_dir, config, use_gpu=FLAGS.use_gpu, run_mode=config.mode)
     capture = cv2.VideoCapture(FLAGS.video_file)
     fps = 30
     width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -594,7 +600,7 @@ def predict_video():
             break
         print('detect frame:%d' % (index))
         index += 1
-        results = detector.predict(frame, FLAGS.threshold, warmup=0, repeats=1)
+        results = detector.predict(frame, detector.config.draw_threshold, warmup=0, repeats=1)
         im = visualize_box_mask(
             frame,
             results,
@@ -626,11 +632,6 @@ if __name__ == '__main__':
     parser.add_argument(
         "--video_file", type=str, default='', help="Path of video file.")
     parser.add_argument(
-        "--run_mode",
-        type=str,
-        default='fluid',
-        help="mode of running(fluid/trt_fp32/trt_fp16)")
-    parser.add_argument(
         "--use_gpu",
         type=ast.literal_eval,
         default=True,
@@ -640,8 +641,6 @@ if __name__ == '__main__':
         type=ast.literal_eval,
         default=False,
         help="Whether to predict a image_file repeatedly for benchmark")
-    parser.add_argument(
-        "--threshold", type=float, default=-1.0, help="Threshold of score.")
     parser.add_argument(
         "--output_dir",
         type=str,
