@@ -43,6 +43,10 @@ Paddle版SOLO: https://github.com/miemie2013/Paddle-SOLO
 
 加入YOLOv4中的数据增强和其余的tricks；更多调优。
 
+## 新坑
+
+第二次从预训练模型重新训练，mAP没这么高了。。。。难道是label_smooth?第一次训练时，一开始我没有用label_smooth，是在第一次训练微调阶段加上的。等待更多实验。
+
 ## 环境搭建
 
 AIStudio已经为我们搭建好大部分依赖。
