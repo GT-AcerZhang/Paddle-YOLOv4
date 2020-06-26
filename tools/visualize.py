@@ -22,36 +22,23 @@ import colorsys
 import random
 
 
-def visualize_box_mask(im, results, labels, mask_resolution=14):
-    """
-    Args:
-        im (str/np.ndarray): path of image/np.ndarray read by cv2
-        results (dict): include 'boxes': np.ndarray: shape:[N,6], N: number of box，
-                        matix element:[class, score, x_min, y_min, x_max, y_max]
-                        MaskRCNN's results include 'masks': np.ndarray:
-                        shape:[N, class_num, mask_resolution, mask_resolution]
-        labels (list): labels:['class1', ..., 'classn']
-        mask_resolution (int): shape of a mask is:[mask_resolution, mask_resolution]
-    Returns:
-        im (PIL.Image.Image): visualized image
-    """
-    print('wwwwwwwwwwwwwwwwwww')
-    print(im)
+def visualize_box_mask(im, results, labels):
     if isinstance(im, str):
-        im = Image.open(im).convert('RGB')
+        with open(im, 'rb') as f:
+            im_read = f.read()
+        data = np.frombuffer(im_read, dtype='uint8')
+        image = cv2.imdecode(data, 1)  # BGR mode
     else:
-        im = Image.fromarray(im)
-    if 'masks' in results and 'boxes' in results:
-        im = draw_mask(
-            im,
-            results['boxes'],
-            results['masks'],
-            labels,
-            resolution=mask_resolution)
+        image = im
+
+    # 获取颜色
+    num_classes = len(labels)
+    colors = get_colors(num_classes)
+
     if 'boxes' in results:
         if len(results['boxes']) > 0:
-            im = draw_box(im, results['boxes'], results['scores'], results['classes'], labels)
-    return im
+            draw(image, results['boxes'], results['scores'], results['classes'], labels, colors)
+    return image
 
 
 def get_color_map_list(num_classes):

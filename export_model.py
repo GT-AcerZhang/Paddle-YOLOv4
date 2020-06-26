@@ -16,7 +16,6 @@ import paddle.fluid as fluid
 import paddle.fluid.layers as P
 from tools.cocotools import get_classes
 from model.yolov4 import YOLOv4
-from model.decode_np import Decode
 
 import logging
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'

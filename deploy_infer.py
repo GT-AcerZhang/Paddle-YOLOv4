@@ -17,7 +17,7 @@ import argparse
 import time
 import yaml
 import ast
-from functools import reduce
+import shutil
 
 from PIL import Image
 import cv2
@@ -398,13 +398,13 @@ def visualize(image_file,
               mask_resolution=14,
               output_dir='output/'):
     # visualize the predict result
-    im = visualize_box_mask(
-        image_file, results, labels, mask_resolution=mask_resolution)
+    im = visualize_box_mask(image_file, results, labels)
     img_name = os.path.split(image_file)[-1]
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    # if os.path.exists(output_dir): shutil.rmtree(output_dir)
+    # os.makedirs(output_dir)
+    if not os.path.exists(output_dir): os.makedirs(output_dir)
     out_path = os.path.join(output_dir, img_name)
-    im.save(out_path, quality=95)
+    cv2.imwrite(out_path, im)
     print("save result to: " + out_path)
 
 
@@ -568,7 +568,7 @@ def predict_image():
         FLAGS.model_dir, config, use_gpu=FLAGS.use_gpu, run_mode=config.mode)
     if FLAGS.run_benchmark:
         detector.predict(
-            FLAGS.image_file, detector.config.draw_threshold, warmup=100, repeats=100)
+            FLAGS.image_file, detector.config.draw_threshold, warmup=10, repeats=10)
     else:
         results = detector.predict(FLAGS.image_file, detector.config.draw_threshold)
         visualize(
@@ -599,14 +599,14 @@ def predict_video():
         if not ret:
             break
         print('detect frame:%d' % (index))
+        print(type(frame))
+        print(frame.shape)
         index += 1
         results = detector.predict(frame, detector.config.draw_threshold, warmup=0, repeats=1)
         im = visualize_box_mask(
             frame,
             results,
-            detector.config.labels,
-            mask_resolution=detector.config.mask_resolution)
-        im = np.array(im)
+            detector.config.labels)
         writer.write(im)
     writer.release()
 
