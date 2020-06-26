@@ -103,8 +103,25 @@ def save_infer_model(save_dir, exe, feed_vars, test_fetches, infer_prog):
         params_filename="__params__")
 
 
-def dump_infer_config(save_dir):
-    shutil.copy('tools/template_cfg.yml', '%s/infer_cfg.yml' % save_dir)
+def dump_infer_config(save_dir, cfg):
+    if os.path.exists('%s/infer_cfg.yml' % save_dir): os.remove('%s/infer_cfg.yml' % save_dir)
+    content = ''
+    with open('tools/template_cfg.yml', 'r', encoding='utf-8') as f:
+        for line in f:
+            for key in cfg:
+                key2 = '${%s}' % key
+                if key2 in line:
+                    if key == 'class_names':
+                        line = ''
+                        for cname in cfg[key]:
+                            line += '- %s\n' % cname
+                    else:
+                        line = line.replace(key2, str(cfg[key]))
+                    break
+            content += line
+    with open('%s/infer_cfg.yml' % save_dir, 'w', encoding='utf-8') as f:
+        f.write(content)
+        f.close()
 
 
 if __name__ == '__main__':
@@ -121,11 +138,25 @@ if __name__ == '__main__':
     # 推理模型保存目录
     save_dir = 'inference_model'
 
-    # 推理时的分数阈值和nms_iou阈值。注意，该值会写死进模型，如需修改请重新导出模型。
+    # 推理时的分数阈值和nms_iou阈值。注意，这些值会写死进模型，如需修改请重新导出模型。
     conf_thresh = 0.05
     nms_thresh = 0.45
     keep_top_k = 100
     nms_top_k = 100
+
+    # need 3 for YOLO arch
+    min_subgraph_size = 3
+
+    # 是否使用Padddle Executor进行推理。
+    use_python_inference = False
+
+    # 使用GPU时，默认为fluid, 可选（fluid/trt_fp32/trt_fp16）
+    mode = 'fluid'
+
+    # 对模型输出的预测框再进行一次分数过滤的阈值。设置为负数表示不再进行分数过滤。
+    # 与conf_thresh不同，需要修改这个值的话直接编辑导出的inference_model/infer_cfg.yml配置文件，不需要重新导出模型。
+    # 总之，inference_model/infer_cfg.yml里的配置可以手动修改，不需要重新导出模型。
+    draw_threshold = -1.0
 
 
     # 初始卷积核个数
@@ -167,6 +198,19 @@ if __name__ == '__main__':
     load_params(exe, infer_prog, model_path)
 
     save_infer_model(save_dir, exe, feed_vars, test_fetches, infer_prog)
-    dump_infer_config(save_dir)
+
+    # 导出配置文件
+    cfg = {}
+    input_shape_h = input_shape[0]
+    input_shape_w = input_shape[1]
+    cfg['min_subgraph_size'] = min_subgraph_size
+    cfg['use_python_inference'] = use_python_inference
+    cfg['mode'] = mode
+    cfg['draw_threshold'] = draw_threshold
+    cfg['input_shape_h'] = input_shape_h
+    cfg['input_shape_w'] = input_shape_w
+    cfg['class_names'] = all_classes
+    dump_infer_config(save_dir, cfg)
+    logger.info("Done.")
 
 
