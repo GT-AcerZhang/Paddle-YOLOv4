@@ -50,13 +50,26 @@ python export_model.py
 
 
 
-python deploy_infer.py --model_dir inference_model --image_file images/test/000000013659.jpg
+python deploy_infer.py --model_dir inference_model --image_dir images/test/
 
 
+
+python deploy_infer.py --model_dir inference_model --video_file D://PycharmProjects/moviepy/nhs.flv
 
 python deploy_infer.py --model_dir inference_model --video_file D://PycharmProjects/moviepy/disco.mp4
 
 
+python deploy_infer.py --model_dir inference_model --play_video D://PycharmProjects/moviepy/nhs.flv
+
+
+
+python deploy_infer.py --model_dir inference_model --play_video D://PycharmProjects/moviepy/disco.mp4
+
+
+
+
+
+pip install opencv-python==3.1.0.5 -i https://mirror.baidu.com/pypi/simple
 
 
 

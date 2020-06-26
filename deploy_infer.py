@@ -23,7 +23,7 @@ from PIL import Image
 import cv2
 import numpy as np
 import paddle.fluid as fluid
-from tools.visualize import visualize_box_mask
+from tools.visualize import visualize_box_mask, get_colors, draw
 
 
 def decode_image(im_file, im_info):
@@ -169,16 +169,16 @@ class Normalize(object):
             im_info (dict): info of processed image
         """
         im = im.astype(np.float32, copy=False)
-        if self.is_channel_first:
-            mean = np.array(self.mean)[:, np.newaxis, np.newaxis]
-            std = np.array(self.std)[:, np.newaxis, np.newaxis]
-        else:
-            mean = np.array(self.mean)[np.newaxis, np.newaxis, :]
-            std = np.array(self.std)[np.newaxis, np.newaxis, :]
+        # if self.is_channel_first:
+        #     mean = np.array(self.mean)[:, np.newaxis, np.newaxis]
+        #     std = np.array(self.std)[:, np.newaxis, np.newaxis]
+        # else:
+        #     mean = np.array(self.mean)[np.newaxis, np.newaxis, :]
+        #     std = np.array(self.std)[np.newaxis, np.newaxis, :]
         if self.is_scale:
             im = im / 255.0
-        im -= mean
-        im /= std
+        # im -= mean
+        # im /= std
         return im, im_info
 
 
@@ -391,23 +391,6 @@ def load_executor(model_dir, use_gpu=False):
         params_filename='__params__')
     return exe, program, fetch_targets
 
-
-def visualize(image_file,
-              results,
-              labels,
-              mask_resolution=14,
-              output_dir='output/'):
-    # visualize the predict result
-    im = visualize_box_mask(image_file, results, labels)
-    img_name = os.path.split(image_file)[-1]
-    # if os.path.exists(output_dir): shutil.rmtree(output_dir)
-    # os.makedirs(output_dir)
-    if not os.path.exists(output_dir): os.makedirs(output_dir)
-    out_path = os.path.join(output_dir, img_name)
-    cv2.imwrite(out_path, im)
-    print("save result to: " + out_path)
-
-
 class Detector():
     """
     Args:
@@ -454,25 +437,18 @@ class Detector():
     def postprocess(self, boxes, scores, classes, im_info, threshold):
         # postprocess output of predictor
         results = {}
-
         # 再做一次分数过滤
         if threshold > 0.:
             expect_boxes = scores > threshold
             boxes = boxes[expect_boxes, :]
             scores = scores[expect_boxes]
             classes = classes[expect_boxes]
-
-        for i, box in enumerate(boxes):
-            print('class_id:{:d}, confidence:{:.2f},'
-                  'left_top:[{:.2f},{:.2f}],'
-                  ' right_bottom:[{:.2f},{:.2f}]'.format(
-                      int(classes[i]), scores[i], box[0], box[1], box[2], box[3]))
         results['boxes'] = boxes
         results['scores'] = scores
         results['classes'] = classes
         return results
 
-    def predict(self, image, threshold=-1.0, warmup=10, repeats=10):
+    def predict(self, image, threshold=-1.0):
         '''
         Args:
             image (str/np.ndarray): path of image/ np.ndarray read by cv2
@@ -488,22 +464,10 @@ class Detector():
 
         # 如果用python预测。
         if self.config.use_python_inference:
-            for i in range(warmup):
-                outs = self.executor.run(self.program,
-                                         feed=inputs,
-                                         fetch_list=self.fecth_targets,
-                                         return_numpy=False)
-            t1 = time.time()
-            for i in range(repeats):
-                print('wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww22222222222222222')
-                print()
-                outs = self.executor.run(self.program,
-                                         feed=inputs,
-                                         fetch_list=self.fecth_targets,
-                                         return_numpy=False)
-            t2 = time.time()
-            ms = (t2 - t1) * 1000.0 / repeats
-            print("Inference: {} ms per batch image".format(ms))
+            outs = self.executor.run(self.program,
+                                     feed=inputs,
+                                     fetch_list=self.fecth_targets,
+                                     return_numpy=False)
             np_boxes = np.array(outs[0][0])
             np_boxes2 = np.array(outs[1][0])
             np_boxes3 = np.array(outs[2][0])
@@ -515,54 +479,43 @@ class Detector():
 
         # 如果用C++预测。
         else:
+            # 填写输入张量
             input_names = self.predictor.get_input_names()
             for i in range(len(inputs)):
                 input_tensor = self.predictor.get_input_tensor(input_names[i])
                 input_tensor.copy_from_cpu(inputs[input_names[i]])
 
-            for i in range(warmup):
-                self.predictor.zero_copy_run()
-                output_names = self.predictor.get_output_names()
-                outs0 = self.predictor.get_output_tensor(output_names[0])
-                outs1 = self.predictor.get_output_tensor(output_names[1])
-                outs2 = self.predictor.get_output_tensor(output_names[2])
+            self.predictor.zero_copy_run()
+            output_names = self.predictor.get_output_names()
 
-            t1 = time.time()
-            for i in range(repeats):
-                self.predictor.zero_copy_run()
-                output_names = self.predictor.get_output_names()
-
-                # 根据output_names看不出哪个输出是boxes 哪个输出是scores 哪个输出是classes
-                outs0 = self.predictor.get_output_tensor(output_names[0])
-                outs1 = self.predictor.get_output_tensor(output_names[1])
-                outs2 = self.predictor.get_output_tensor(output_names[2])
-                outs0 = outs0.copy_to_cpu()[0]   # fastnms后处理时通过reshape()腾出第0维是批大小，这里因为默认批大小是1，故取0
-                outs1 = outs1.copy_to_cpu()[0]   # fastnms后处理时通过reshape()腾出第0维是批大小，这里因为默认批大小是1，故取0
-                outs2 = outs2.copy_to_cpu()[0]   # fastnms后处理时通过reshape()腾出第0维是批大小，这里因为默认批大小是1，故取0
-                # 识别哪个输出是boxes 哪个输出是scores 哪个输出是classes
-                for o in [outs0, outs1, outs2]:
-                    if len(o.shape) == 2:
-                        boxes = o
+            # 根据output_names看不出哪个输出是boxes 哪个输出是scores 哪个输出是classes
+            outs0 = self.predictor.get_output_tensor(output_names[0])
+            outs1 = self.predictor.get_output_tensor(output_names[1])
+            outs2 = self.predictor.get_output_tensor(output_names[2])
+            outs0 = outs0.copy_to_cpu()[0]   # fastnms后处理时通过reshape()腾出第0维是批大小，这里因为默认批大小是1，故取0
+            outs1 = outs1.copy_to_cpu()[0]   # fastnms后处理时通过reshape()腾出第0维是批大小，这里因为默认批大小是1，故取0
+            outs2 = outs2.copy_to_cpu()[0]   # fastnms后处理时通过reshape()腾出第0维是批大小，这里因为默认批大小是1，故取0
+            # 识别哪个输出是boxes 哪个输出是scores 哪个输出是classes
+            for o in [outs0, outs1, outs2]:
+                if len(o.shape) == 2:
+                    boxes = o
+                else:
+                    if o.dtype == np.float32:
+                        scores = o
                     else:
-                        if o.dtype == np.float32:
-                            scores = o
-                        else:
-                            classes = o
-            t2 = time.time()
-            cost = (t2 - t1)
-            print('warmup: %d' % warmup)
-            print('repeats: %d' % repeats)
-            print('Speed: %.6fs per image,  %.1f FPS.'%((cost / repeats), (repeats / cost)))
+                        classes = o
         # 后处理那里，一定不会返回空。若没有物体，scores[0]会是负数，由此来判断有没有物体。
         if scores[0] < 0:
-            print('[WARNNING] No object detected.')
+            if isinstance(image, str):
+                print('[WARNNING] No object detected in %s.' % image)
             results = {'boxes': np.array([])}
         else:
             results = self.postprocess(boxes, scores, classes, im_info, threshold=threshold)
         return results
 
 
-def predict_image():
+
+def predict_images():
     config = Config(FLAGS.model_dir)
     detector = Detector(
         FLAGS.model_dir, config, use_gpu=FLAGS.use_gpu, run_mode=config.mode)
@@ -570,13 +523,98 @@ def predict_image():
         detector.predict(
             FLAGS.image_file, detector.config.draw_threshold, warmup=10, repeats=10)
     else:
-        results = detector.predict(FLAGS.image_file, detector.config.draw_threshold)
-        visualize(
-            FLAGS.image_file,
+        # if os.path.exists(FLAGS.output_dir): shutil.rmtree(FLAGS.output_dir)
+        # os.makedirs(FLAGS.output_dir)
+        if not os.path.exists(FLAGS.output_dir): os.makedirs(FLAGS.output_dir)
+
+
+        # 获取颜色
+        num_classes = len(detector.config.labels)
+        colors = get_colors(num_classes)
+
+        path_dir = os.listdir(FLAGS.image_dir)
+        # warm up
+        if FLAGS.use_gpu:
+            for k, filename in enumerate(path_dir):
+                img_path = FLAGS.image_dir + filename
+                results = detector.predict(img_path, detector.config.draw_threshold)
+                if k == 10:
+                    break
+
+        num_imgs = len(path_dir)
+        start = time.time()
+
+        for k, filename in enumerate(path_dir):
+            img_path = FLAGS.image_dir + filename
+            results = detector.predict(img_path, detector.config.draw_threshold)
+            image = cv2.imread(img_path)
+            if len(results['boxes']) > 0:
+                draw(image, results['boxes'], results['scores'], results['classes'], detector.config.labels, colors)
+            out_path = os.path.join(FLAGS.output_dir, filename)
+            cv2.imwrite(out_path, image)
+            print("Detection bbox results save in {}".format(out_path))
+        cost = time.time() - start
+        print('total time: {0:.6f}s'.format(cost))
+        print('Speed: %.6fs per image,  %.1f FPS.' % ((cost / num_imgs), (num_imgs / cost)))
+
+
+def play_video():
+    config = Config(FLAGS.model_dir)
+    detector = Detector(
+        FLAGS.model_dir, config, use_gpu=FLAGS.use_gpu, run_mode=config.mode)
+    # if os.path.exists(FLAGS.output_dir): shutil.rmtree(FLAGS.output_dir)
+    # os.makedirs(FLAGS.output_dir)
+    if not os.path.exists(FLAGS.output_dir): os.makedirs(FLAGS.output_dir)
+
+
+    # 获取颜色
+    num_classes = len(detector.config.labels)
+    colors = get_colors(num_classes)
+
+
+    # warm up
+    image_dir = 'images/test/'
+    path_dir = os.listdir(image_dir)
+    if FLAGS.use_gpu:
+        for k, filename in enumerate(path_dir):
+            img_path = image_dir + filename
+            results = detector.predict(img_path, detector.config.draw_threshold)
+            if k == 10:
+                break
+
+
+    capture = cv2.VideoCapture(FLAGS.play_video)
+    fps = 30
+    width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video_name = os.path.split(FLAGS.play_video)[-1]
+    if not os.path.exists(FLAGS.output_dir):
+        os.makedirs(FLAGS.output_dir)
+    out_path = os.path.join(FLAGS.output_dir, video_name)
+    writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
+    index = 1
+    start = time.time()
+    while (1):
+        ret, frame = capture.read()
+        if not ret:
+            break
+        print('detect frame:%d' % (index))
+        index += 1
+        results = detector.predict(frame, detector.config.draw_threshold)
+        im = visualize_box_mask(
+            frame,
             results,
-            detector.config.labels,
-            mask_resolution=detector.config.mask_resolution,
-            output_dir=FLAGS.output_dir)
+            detector.config.labels)
+        # cv2.imshow("detection", frame)
+        writer.write(im)
+        # if cv2.waitKey(110) & 0xff == 27:
+        #     break
+    writer.release()
+    num_imgs = 100
+    cost = time.time() - start
+    print('total time: {0:.6f}s'.format(cost))
+    print('Speed: %.6fs per image,  %.1f FPS.' % ((cost / num_imgs), (num_imgs / cost)))
 
 
 def predict_video():
@@ -599,10 +637,8 @@ def predict_video():
         if not ret:
             break
         print('detect frame:%d' % (index))
-        print(type(frame))
-        print(frame.shape)
         index += 1
-        results = detector.predict(frame, detector.config.draw_threshold, warmup=0, repeats=1)
+        results = detector.predict(frame, detector.config.draw_threshold)
         im = visualize_box_mask(
             frame,
             results,
@@ -628,9 +664,11 @@ if __name__ == '__main__':
               "'infer_cfg.yml', created by tools/export_model.py."),
         required=True)
     parser.add_argument(
-        "--image_file", type=str, default='', help="Path of image file.")
+        "--image_dir", type=str, default='', help="Path of image dir.")
     parser.add_argument(
         "--video_file", type=str, default='', help="Path of video file.")
+    parser.add_argument(
+        "--play_video", type=str, default='', help="Path of video file.")
     parser.add_argument(
         "--use_gpu",
         type=ast.literal_eval,
@@ -650,11 +688,11 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
     print_arguments(FLAGS)
 
-    if FLAGS.image_file != '' and FLAGS.video_file != '':
-        assert "Cannot predict image and video at the same time"
-    if FLAGS.image_file != '':
-        predict_image()
+    if FLAGS.image_dir != '':
+        predict_images()
     if FLAGS.video_file != '':
         predict_video()
+    if FLAGS.play_video != '':
+        play_video()
 
 
