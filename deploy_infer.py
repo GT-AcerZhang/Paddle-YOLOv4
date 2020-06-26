@@ -606,10 +606,10 @@ def play_video():
             frame,
             results,
             detector.config.labels)
-        # cv2.imshow("detection", frame)
+        cv2.imshow("detection", frame)
         writer.write(im)
-        # if cv2.waitKey(110) & 0xff == 27:
-        #     break
+        if cv2.waitKey(110) & 0xff == 27:
+            break
     writer.release()
     num_imgs = 100
     cost = time.time() - start

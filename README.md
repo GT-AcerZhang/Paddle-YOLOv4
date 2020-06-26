@@ -153,8 +153,28 @@ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.651
 ## 预测
 运行demo.py。
 
-## 部署
-占位
+## 导出
+```
+python export_model.py
+```
+关于导出的参数请看export_model.py中的注释。导出后的模型默认存放在inference_model目录下，带有一个配置文件infer_cfg.yml。
+
+用导出后的模型预测图片：
+```
+python deploy_infer.py --model_dir inference_model --image_dir images/test/
+```
+
+用导出后的模型预测视频：
+```
+python deploy_infer.py --model_dir inference_model --video_file D://PycharmProjects/moviepy/dddd.mp4
+```
+
+用导出后的模型播放视频：（按esc键停止播放）
+```
+python deploy_infer.py --model_dir inference_model --play_video D://PycharmProjects/moviepy/dddd.mp4
+```
+
+
 
 ## 传送门
 cv算法交流q群：645796480
