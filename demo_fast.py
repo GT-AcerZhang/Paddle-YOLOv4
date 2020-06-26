@@ -11,17 +11,17 @@ from collections import deque
 import datetime
 import cv2
 import os
-import colorsys
-import random
 import time
 import numpy as np
 import paddle.fluid as fluid
 import paddle.fluid.layers as P
 from tools.cocotools import get_classes
 from model.yolov4 import YOLOv4
-from model.decode_np import Decode
+from tools.visualize import get_colors, draw
 
 import logging
+
+
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
@@ -37,26 +37,6 @@ def process_image(img, input_shape):
     pimage = np.expand_dims(pimage, axis=0)
     return pimage
 
-
-def draw(image, boxes, scores, classes, all_classes, colors):
-    image_h, image_w, _ = image.shape
-    for box, score, cl in zip(boxes, scores, classes):
-        x0, y0, x1, y1 = box
-        left = max(0, np.floor(x0 + 0.5).astype(int))
-        top = max(0, np.floor(y0 + 0.5).astype(int))
-        right = min(image.shape[1], np.floor(x1 + 0.5).astype(int))
-        bottom = min(image.shape[0], np.floor(y1 + 0.5).astype(int))
-        bbox_color = colors[cl]
-        # bbox_thick = 1 if min(image_h, image_w) < 400 else 2
-        bbox_thick = 1
-        cv2.rectangle(image, (left, top), (right, bottom), bbox_color, bbox_thick)
-        bbox_mess = '%s: %.2f' % (all_classes[cl], score)
-        t_size = cv2.getTextSize(bbox_mess, 0, 0.5, thickness=1)[0]
-        cv2.rectangle(image, (left, top), (left + t_size[0], top - t_size[1] - 3), bbox_color, -1)
-        cv2.putText(image, bbox_mess, (left, top - 2), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (0, 0, 0), 1, lineType=cv2.LINE_AA)
-
-
 use_gpu = False
 use_gpu = True
 
@@ -65,7 +45,7 @@ if __name__ == '__main__':
     classes_path = 'data/coco_classes.txt'
     # model_path可以是'yolov4'、'./weights/1000'这些。
     model_path = 'yolov4'
-    model_path = './weights/2000'
+    model_path = './weights/1'
 
     # input_shape越大，精度会上升，但速度会下降。
     # input_shape = (320, 320)
@@ -116,13 +96,8 @@ if __name__ == '__main__':
 
     if not os.path.exists('images/res/'): os.mkdir('images/res/')
 
-    # 定义颜色
-    hsv_tuples = [(1.0 * x / num_classes, 1., 1.) for x in range(num_classes)]
-    colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
-    colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
-    random.seed(0)
-    random.shuffle(colors)
-    random.seed(None)
+    # 获取颜色
+    colors = get_colors(num_classes)
 
 
     path_dir = os.listdir('images/test')

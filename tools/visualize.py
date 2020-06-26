@@ -18,6 +18,8 @@ from __future__ import division
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw
+import colorsys
+import random
 
 
 def visualize_box_mask(im, results, labels, mask_resolution=14):
@@ -33,6 +35,8 @@ def visualize_box_mask(im, results, labels, mask_resolution=14):
     Returns:
         im (PIL.Image.Image): visualized image
     """
+    print('wwwwwwwwwwwwwwwwwww')
+    print(im)
     if isinstance(im, str):
         im = Image.open(im).convert('RGB')
     else:
@@ -190,5 +194,35 @@ def draw_box(im, boxes, scores, classes, labels):
             [(xmin + 1, ymin - th), (xmin + tw + 1, ymin)], fill=color)
         draw.text((xmin + 1, ymin - th), text, fill=(255, 255, 255))
     return im
+
+
+
+
+def get_colors(n_colors):
+    hsv_tuples = [(1.0 * x / n_colors, 1., 1.) for x in range(n_colors)]
+    colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
+    colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
+    random.seed(0)
+    random.shuffle(colors)
+    random.seed(None)
+    return colors
+
+def draw(image, boxes, scores, classes, all_classes, colors):
+    image_h, image_w, _ = image.shape
+    for box, score, cl in zip(boxes, scores, classes):
+        x0, y0, x1, y1 = box
+        left = max(0, np.floor(x0 + 0.5).astype(int))
+        top = max(0, np.floor(y0 + 0.5).astype(int))
+        right = min(image.shape[1], np.floor(x1 + 0.5).astype(int))
+        bottom = min(image.shape[0], np.floor(y1 + 0.5).astype(int))
+        bbox_color = colors[cl]
+        bbox_thick = 1
+        cv2.rectangle(image, (left, top), (right, bottom), bbox_color, bbox_thick)
+        bbox_mess = '%s: %.2f' % (all_classes[cl], score)
+        t_size = cv2.getTextSize(bbox_mess, 0, 0.5, thickness=1)[0]
+        cv2.rectangle(image, (left, top), (left + t_size[0], top - t_size[1] - 3), bbox_color, -1)
+        cv2.putText(image, bbox_mess, (left, top - 2), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, (0, 0, 0), 1, lineType=cv2.LINE_AA)
+
 
 
