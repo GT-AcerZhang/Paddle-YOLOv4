@@ -1,16 +1,17 @@
 #! /usr/bin/env python
 # coding=utf-8
-#================================================================
+# ================================================================
 #
 #   Author      : miemie2013
 #   Created date: 2020-06-10 10:20:27
 #   Description : paddlepaddle_yolov4
 #
-#================================================================
+# ================================================================
 import paddle.fluid as fluid
 import paddle.fluid.layers as P
 from paddle.fluid.param_attr import ParamAttr
 from paddle.fluid.regularizer import L2Decay
+import numpy as np
 
 from model.fastnms import fastnms
 
@@ -19,8 +20,10 @@ def _softplus(input):
     expf = fluid.layers.exp(fluid.layers.clip(input, -200, 50))
     return fluid.layers.log(1 + expf)
 
+
 def _mish(input):
     return input * fluid.layers.tanh(_softplus(input))
+
 
 def conv2d_unit(x, filters, kernels, stride=1, padding=0, bn=1, act='mish', name='', is_test=False, trainable=True):
     use_bias = (bn != 1)
@@ -63,17 +66,20 @@ def conv2d_unit(x, filters, kernels, stride=1, padding=0, bn=1, act='mish', name
         x = _mish(x)
     return x
 
+
 def residual_block(inputs, filters_1, filters_2, conv_start_idx, is_test, trainable):
-    x = conv2d_unit(inputs, filters_1, 1, stride=1, padding=0, name='conv%.3d'% conv_start_idx, is_test=is_test, trainable=trainable)
-    x = conv2d_unit(x, filters_2, 3, stride=1, padding=1, name='conv%.3d'% (conv_start_idx+1), is_test=is_test, trainable=trainable)
+    x = conv2d_unit(inputs, filters_1, 1, stride=1, padding=0, name='conv%.3d' % conv_start_idx, is_test=is_test, trainable=trainable)
+    x = conv2d_unit(x, filters_2, 3, stride=1, padding=1, name='conv%.3d' % (conv_start_idx + 1), is_test=is_test, trainable=trainable)
     x = fluid.layers.elementwise_add(x=inputs, y=x, act=None)
     return x
+
 
 def stack_residual_block(inputs, filters_1, filters_2, n, conv_start_idx, is_test, trainable):
     x = residual_block(inputs, filters_1, filters_2, conv_start_idx, is_test, trainable)
     for i in range(n - 1):
-        x = residual_block(x, filters_1, filters_2, conv_start_idx+2*(1+i), is_test, trainable)
+        x = residual_block(x, filters_1, filters_2, conv_start_idx + 2 * (1 + i), is_test, trainable)
     return x
+
 
 def _spp(x):
     x_1 = x
@@ -121,7 +127,7 @@ def decode(conv_output, anchors, stride, num_class):
     offset = P.concat([rows, cols], axis=-1)
     offset = P.reshape(offset, (1, n_grid, n_grid, 1, 2))
     offset = P.expand(offset, [batch_size, 1, 1, anchor_per_scale, 1])
-    
+
     pred_xy = (P.sigmoid(conv_raw_dxdy) + offset) * stride
     pred_wh = (P.exp(conv_raw_dwdh) * P.assign(anchors))
     pred_xywh = P.concat([pred_xy, pred_wh], axis=-1)
@@ -134,9 +140,9 @@ def decode(conv_output, anchors, stride, num_class):
     return pred_xywh, pred_conf, pred_prob
 
 
-
 def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, trainable=True,
-           fast=False, resize_shape=None, origin_shape=None, anchors=None, conf_thresh=0.05, nms_thresh=0.45, keep_top_k=100, nms_top_k=100):
+           fast=False, resize_shape=None, origin_shape=None, anchors=None, conf_thresh=0.05, nms_thresh=0.45,
+           keep_top_k=100, nms_top_k=100):
     i32 = initial_filters
     i64 = i32 * 2
     i128 = i32 * 4
@@ -230,8 +236,10 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
     x = conv2d_unit(x, i128, 1, stride=1, act='leaky', name='conv090', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i256, 3, stride=1, padding=1, act='leaky', name='conv091', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i128, 1, stride=1, act='leaky', name='conv092', is_test=is_test, trainable=trainable)
-    output_s = conv2d_unit(x, i256, 3, stride=1, padding=1, act='leaky', name='conv093', is_test=is_test, trainable=trainable)
-    output_s = conv2d_unit(output_s, num_anchors * (num_classes + 5), 1, stride=1, bn=0, act=None, name='conv094', is_test=is_test, trainable=trainable)
+    output_s = conv2d_unit(x, i256, 3, stride=1, padding=1, act='leaky', name='conv093', is_test=is_test,
+                           trainable=trainable)
+    output_s = conv2d_unit(output_s, num_anchors * (num_classes + 5), 1, stride=1, bn=0, act=None, name='conv094',
+                           is_test=is_test, trainable=trainable)
 
     # output_m
     x = conv2d_unit(x, i256, 3, stride=2, padding=1, act='leaky', name='conv095', is_test=is_test, trainable=trainable)
@@ -241,8 +249,10 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
     x = conv2d_unit(x, i256, 1, stride=1, act='leaky', name='conv098', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i512, 3, stride=1, padding=1, act='leaky', name='conv099', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i256, 1, stride=1, act='leaky', name='conv100', is_test=is_test, trainable=trainable)
-    output_m = conv2d_unit(x, i512, 3, stride=1, padding=1, act='leaky', name='conv101', is_test=is_test, trainable=trainable)
-    output_m = conv2d_unit(output_m, num_anchors * (num_classes + 5), 1, stride=1, bn=0, act=None, name='conv102', is_test=is_test, trainable=trainable)
+    output_m = conv2d_unit(x, i512, 3, stride=1, padding=1, act='leaky', name='conv101', is_test=is_test,
+                           trainable=trainable)
+    output_m = conv2d_unit(output_m, num_anchors * (num_classes + 5), 1, stride=1, bn=0, act=None, name='conv102',
+                           is_test=is_test, trainable=trainable)
 
     # output_l
     x = conv2d_unit(x, i512, 3, stride=2, padding=1, act='leaky', name='conv103', is_test=is_test, trainable=trainable)
@@ -252,35 +262,91 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
     x = conv2d_unit(x, i512, 1, stride=1, act='leaky', name='conv106', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i1024, 3, stride=1, padding=1, act='leaky', name='conv107', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i512, 1, stride=1, act='leaky', name='conv108', is_test=is_test, trainable=trainable)
-    output_l = conv2d_unit(x, i1024, 3, stride=1, padding=1, act='leaky', name='conv109', is_test=is_test, trainable=trainable)
-    output_l = conv2d_unit(output_l, num_anchors * (num_classes + 5), 1, stride=1, bn=0, act=None, name='conv110', is_test=is_test, trainable=trainable)
+    output_l = conv2d_unit(x, i1024, 3, stride=1, padding=1, act='leaky', name='conv109', is_test=is_test,
+                           trainable=trainable)
+    output_l = conv2d_unit(output_l, num_anchors * (num_classes + 5), 1, stride=1, bn=0, act=None, name='conv110',
+                           is_test=is_test, trainable=trainable)
 
+    # 用张量操作实现后处理
+    if fast:
+        # 先对坐标解码
+
+        use_yolo_box = True
+        # use_yolo_box = False
+
+        # 第一种方式。慢一点，但支持修改。
+        if not use_yolo_box:
+            # 相当于numpy的transpose()，交换下标
+            output_l = fluid.layers.transpose(output_l, perm=[0, 2, 3, 1], name='output_l')
+            output_m = fluid.layers.transpose(output_m, perm=[0, 2, 3, 1], name='output_m')
+            output_s = fluid.layers.transpose(output_s, perm=[0, 2, 3, 1], name='output_s')
+            pred_xywh_s, pred_conf_s, pred_prob_s = decode(output_s, anchors[0], 8, num_classes)
+            pred_xywh_m, pred_conf_m, pred_prob_m = decode(output_m, anchors[1], 16, num_classes)
+            pred_xywh_l, pred_conf_l, pred_prob_l = decode(output_l, anchors[2], 32, num_classes)
+            # 获取分数。可以不用将pred_conf_s第2维重复80次，paddle支持直接相乘。
+            pred_score_s = pred_conf_s * pred_prob_s
+            pred_score_m = pred_conf_m * pred_prob_m
+            pred_score_l = pred_conf_l * pred_prob_l
+            # 所有输出层的预测框集合后再执行nms
+            all_pred_boxes = P.concat([pred_xywh_s, pred_xywh_m, pred_xywh_l], axis=1)       # [batch_size, -1, 4]
+            all_pred_scores = P.concat([pred_score_s, pred_score_m, pred_score_l], axis=1)   # [batch_size, -1, 80]
+
+
+        # 第二种方式。用官方yolo_box()函数快一点
+        if use_yolo_box:
+            anchors = anchors.astype(np.int32)
+            anchors = np.reshape(anchors, (-1, num_anchors*2))
+            anchors = anchors.tolist()
+            # [bz, ?1, 4]  [bz, ?1, 80]   注意，是过滤置信度位小于conf_thresh的，而不是过滤最终分数！
+            bbox_l, prob_l = fluid.layers.yolo_box(
+                x=output_l,
+                img_size=fluid.layers.ones(shape=[1, 2], dtype="int32"),   # 返回归一化的坐标，而且是x0y0x1y1格式
+                anchors=anchors[2],
+                class_num=num_classes,
+                conf_thresh=conf_thresh,
+                downsample_ratio=32,
+                clip_bbox=False)
+            bbox_m, prob_m = fluid.layers.yolo_box(
+                x=output_m,
+                img_size=fluid.layers.ones(shape=[1, 2], dtype="int32"),   # 返回归一化的坐标，而且是x0y0x1y1格式
+                anchors=anchors[1],
+                class_num=num_classes,
+                conf_thresh=conf_thresh,
+                downsample_ratio=16,
+                clip_bbox=False)
+            bbox_s, prob_s = fluid.layers.yolo_box(
+                x=output_s,
+                img_size=fluid.layers.ones(shape=[1, 2], dtype="int32"),   # 返回归一化的坐标，而且是x0y0x1y1格式
+                anchors=anchors[0],
+                class_num=num_classes,
+                conf_thresh=conf_thresh,
+                downsample_ratio=8,
+                clip_bbox=False)
+            boxes = []
+            scores = []
+            boxes.append(bbox_l)
+            boxes.append(bbox_m)
+            boxes.append(bbox_s)
+            scores.append(prob_l)
+            scores.append(prob_m)
+            scores.append(prob_s)
+            all_pred_boxes = fluid.layers.concat(boxes, axis=1)  # [batch_size, -1, 4]
+            # 把x0y0x1y1格式转换成cx_cy_w_h格式
+            all_pred_boxes = P.concat([(all_pred_boxes[:, :, :2] + all_pred_boxes[:, :, 2:]) * 0.5,
+                                       all_pred_boxes[:, :, 2:] - all_pred_boxes[:, :, :2]], axis=-1)
+            all_pred_scores = fluid.layers.concat(scores, axis=1)  # [batch_size, -1, 80]
+            # 官方的multiclass_nms()也更快一点。但是为了之后的深度定制。
+
+
+        # 用fastnms
+        boxes, scores, classes = fastnms(all_pred_boxes, all_pred_scores, resize_shape, origin_shape, conf_thresh,
+                                         nms_thresh, keep_top_k, nms_top_k, use_yolo_box)
+        return boxes, scores, classes
 
     # 相当于numpy的transpose()，交换下标
     output_l = fluid.layers.transpose(output_l, perm=[0, 2, 3, 1], name='output_l')
     output_m = fluid.layers.transpose(output_m, perm=[0, 2, 3, 1], name='output_m')
     output_s = fluid.layers.transpose(output_s, perm=[0, 2, 3, 1], name='output_s')
-
-    # 用张量操作实现后处理
-    if fast:
-        # 先对坐标解码
-        pred_xywh_s, pred_conf_s, pred_prob_s = decode(output_s, anchors[0], 8, num_classes)
-        pred_xywh_m, pred_conf_m, pred_prob_m = decode(output_m, anchors[1], 16, num_classes)
-        pred_xywh_l, pred_conf_l, pred_prob_l = decode(output_l, anchors[2], 32, num_classes)
-        # 获取分数。可以不用将pred_conf_s第2维重复80次，paddle支持直接相乘。
-        # pred_conf_s = P.expand(pred_conf_s, [1, 1, num_classes])  # [bz, -1, 80]
-        # pred_conf_m = P.expand(pred_conf_m, [1, 1, num_classes])  # [bz, -1, 80]
-        # pred_conf_l = P.expand(pred_conf_l, [1, 1, num_classes])  # [bz, -1, 80]
-        pred_score_s = pred_conf_s * pred_prob_s
-        pred_score_m = pred_conf_m * pred_prob_m
-        pred_score_l = pred_conf_l * pred_prob_l
-        # 所有输出层的预测框集合后再执行nms
-        all_pred_boxes = P.concat([pred_xywh_s, pred_xywh_m, pred_xywh_l], axis=1)       # [batch_size, -1, 4]
-        all_pred_scores = P.concat([pred_score_s, pred_score_m, pred_score_l], axis=1)   # [batch_size, -1, 80]
-
-        # 用fastnms
-        boxes, scores, classes = fastnms(all_pred_boxes, all_pred_scores, resize_shape, origin_shape, conf_thresh, nms_thresh, keep_top_k, nms_top_k)
-        return boxes, scores, classes
     return output_l, output_m, output_s
 
 

@@ -481,7 +481,7 @@ class Detector():
         else:
             # 填写输入张量
             input_names = self.predictor.get_input_names()
-            for i in range(len(inputs)):
+            for i in range(len(input_names)):
                 input_tensor = self.predictor.get_input_tensor(input_names[i])
                 input_tensor.copy_from_cpu(inputs[input_names[i]])
 

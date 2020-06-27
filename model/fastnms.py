@@ -102,7 +102,8 @@ def fast_nms(boxes, scores, conf_thresh, nms_thresh, keep_top_k, nms_top_k):
 
     return boxes, scores, classes
 
-def fastnms(all_pred_boxes, all_pred_scores, resize_shape, origin_shape, conf_thresh, nms_thresh, keep_top_k, nms_top_k):
+def fastnms(all_pred_boxes, all_pred_scores, resize_shape,
+            origin_shape, conf_thresh, nms_thresh, keep_top_k, nms_top_k, use_yolo_box):
     '''
     :param all_pred_boxes:      [batch_size, -1, 4]
     :param all_pred_scores:     [batch_size, -1, 80]
@@ -156,7 +157,10 @@ def fastnms(all_pred_boxes, all_pred_scores, resize_shape, origin_shape, conf_th
     # 缩放到原图大小
     resize_shape_f = P.cast(resize_shape, 'float32')
     origin_shape_f = P.cast(origin_shape, 'float32')
-    scale = origin_shape_f / resize_shape_f
+    if use_yolo_box:
+        scale = origin_shape_f
+    else:
+        scale = origin_shape_f / resize_shape_f
     scale = P.expand(scale, [1, 2])
     boxes *= scale   # 批大小是1才支持这么做，因为scale第0维表示批大小，boxes第0维却表示这张图片预测出的物体数
 
