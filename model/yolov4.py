@@ -109,7 +109,7 @@ def _spp(x):
 
 
 # 对坐标解码
-def decode(conv_output, anchors, stride, num_class):
+def decode(conv_output, anchors, stride, num_class, conf_thresh):
     conv_shape       = P.shape(conv_output)
     batch_size       = conv_shape[0]
     n_grid           = conv_shape[1]
@@ -280,9 +280,9 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
             output_l = fluid.layers.transpose(output_l, perm=[0, 2, 3, 1], name='output_l')
             output_m = fluid.layers.transpose(output_m, perm=[0, 2, 3, 1], name='output_m')
             output_s = fluid.layers.transpose(output_s, perm=[0, 2, 3, 1], name='output_s')
-            pred_xywh_s, pred_conf_s, pred_prob_s = decode(output_s, anchors[0], 8, num_classes)
-            pred_xywh_m, pred_conf_m, pred_prob_m = decode(output_m, anchors[1], 16, num_classes)
-            pred_xywh_l, pred_conf_l, pred_prob_l = decode(output_l, anchors[2], 32, num_classes)
+            pred_xywh_s, pred_conf_s, pred_prob_s = decode(output_s, anchors[0], 8, num_classes, conf_thresh)
+            pred_xywh_m, pred_conf_m, pred_prob_m = decode(output_m, anchors[1], 16, num_classes, conf_thresh)
+            pred_xywh_l, pred_conf_l, pred_prob_l = decode(output_l, anchors[2], 32, num_classes, conf_thresh)
             # 获取分数。可以不用将pred_conf_s第2维重复80次，paddle支持直接相乘。
             pred_score_s = pred_conf_s * pred_prob_s
             pred_score_m = pred_conf_m * pred_prob_m

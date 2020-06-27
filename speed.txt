@@ -1,0 +1,24 @@
+
+
+都是导出后的数值
+=============================== yolov4 ========================================
+(416x416, nms_threshold: 0.45, score_threshold: 0.05)导出
+win10+cuda10+1660TI
+
+用自己写的decode(), fastnms()
+yolov4约为 11 FPS，V100 24 FPS
+
+
+用官方API的yolo_box 12 FPS，V100 25 FPS
+
+
+用官方API的yolo_box、multiclass_nms  V100 是 26.8 FPS。可见自实现的fastnms()慢了1.8帧
+
+
+
+考虑用numpy、numba、python_op、C++ op写后处理，超过26.8 FPS。
+
+
+把它优化好再优化yolact。
+
+
