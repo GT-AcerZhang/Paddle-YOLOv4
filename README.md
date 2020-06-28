@@ -37,7 +37,7 @@ Paddle版SOLO: https://github.com/miemie2013/Paddle-SOLO
 2020/06/18:经过验证，Paddle镜像版YOLOv4：https://github.com/miemie2013/Paddle-YOLOv4
 ，可以刷到43.4mAP（不冻结任何层的情况下），赶紧star我的Paddle版YOLOv4，去AIStudio抢显卡训练吧！
 
-2020/06/25:支持yolact中的fastnms。运行demo_fast.py即可体验。
+2020/06/25:支持yolact中的fastnms。运行demo_fast.py即可体验。经过试验发现并没有官方的yolo_box()、multiclass_nms()快。可能需要用C++ op重写。
 
 ## 需要补充
 
@@ -84,10 +84,11 @@ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.665
 即AIStudio的~/work/就是项目的根目录。
 把windows中的yolov4文件夹打包成zip，通过AIStudio的“创建数据集”将zip包上传。
 创建的项目使用这个数据集和COCO2017数据集，就可以完成预训练模型上传了。
+(为了方便大家使用，我已经上传了预训练模型，本仓库自带的数据集“yolov4_pretrained”就是预训练模型了，在~/data/data40855/目录下)
 进入AIStudio，把上传的预训练模型解压：
 ```
 cd ~/w*
-cp ../data/data39638/yolov4.zip ./yolov4.zip
+cp ../data/data40855/yolov4.zip ./yolov4.zip
 unzip yolov4.zip
 ```
 此外，你还要安装pycocotools依赖、解压COCO2017数据集：
@@ -110,7 +111,7 @@ rm -f train.txt
 nohup python train.py>> train.txt 2>&1 &
 ```
 通过修改config.py代码来进行更换数据集、更改超参数以及训练参数。
-训练时默认每5000步计算一次验证集的mAP。
+训练时默认每5000步计算一次验证集的mAP。或者运行eval.py评估指定模型的mAP。该mAP是val集的结果。
 
 训练时如果发现mAP很稳定了，就停掉，修改学习率为原来的十分之一，接着继续训练，mAP还会再上升。暂时是这样手动操作。
 

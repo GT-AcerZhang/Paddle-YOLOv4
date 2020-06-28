@@ -5,7 +5,7 @@
 # 仓库使用这个数据集和COCO2017数据集，就可以完成预训练模型上传了。
 # 进入AIStudio，把上传的预训练模型解压：
 cd ~/w*
-cp ../data/data39638/yolov4.zip ./yolov4.zip
+cp ../data/data40855/yolov4.zip ./yolov4.zip
 unzip yolov4.zip
 
 
