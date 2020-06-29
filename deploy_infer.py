@@ -546,39 +546,31 @@ class Detector():
             outs2 = outs2.copy_to_cpu()[0]
 
             # 在这里后处理
-            # output_l, output_m, output_s = 1
             # 识别哪个输出是output_l 哪个输出是output_m 哪个输出是output_s
-            n_grids = []
-            outs = [outs0, outs1, outs2]
-            for i, o in enumerate(outs):
-                n_grids.append(o.shape[0])
-            n_grids = np.array(n_grids, 'int32')
-            idx = np.argsort(n_grids)
-            n_grids = n_grids[idx]
-            outs2 = []
-            for _idx in idx:
-                outs2.append(outs[_idx])
+            # n_grids = []
+            # outs = [outs0, outs1, outs2]
+            # for i, o in enumerate(outs):
+            #     n_grids.append(o.shape[0])
+            # n_grids = np.array(n_grids, 'int32')
+            # idx = np.argsort(n_grids)
+            # n_grids = n_grids[idx]
+            # outs2 = []
+            # for _idx in idx:
+            #     outs2.append(outs[_idx])
+            # conf_thresh = pcfg.conf_thresh
+            # num_classes = 80
+            # input_shape = (416, 416)
+            # a1 = np.reshape(outs2[0], (1, input_shape[0] // 32, input_shape[1] // 32, 3, 5 + num_classes))
+            # a2 = np.reshape(outs2[1], (1, input_shape[0] // 16, input_shape[1] // 16, 3, 5 + num_classes))
+            # a3 = np.reshape(outs2[2], (1, input_shape[0] // 8, input_shape[1] // 8, 3, 5 + num_classes))
+            # h = im_info['origin_shape'][0]
+            # w = im_info['origin_shape'][1]
+            # boxes, scores, classes = _yolo_out([a1, a2, a3], (h, w), input_shape, conf_thresh)
 
-            # pred_xywh_list = []
-            # pred_conf_list = []
-            # pred_prob_list = []
-            conf_thresh = pcfg.conf_thresh
-
-            num_classes = 80
-            input_shape = (416, 416)
-            a1 = np.reshape(outs2[0], (1, input_shape[0] // 32, input_shape[1] // 32, 3, 5 + num_classes))
-            a2 = np.reshape(outs2[1], (1, input_shape[0] // 16, input_shape[1] // 16, 3, 5 + num_classes))
-            a3 = np.reshape(outs2[2], (1, input_shape[0] // 8, input_shape[1] // 8, 3, 5 + num_classes))
-            h = im_info['origin_shape'][0]
-            w = im_info['origin_shape'][1]
-            # print(im_info)
-            boxes, scores, classes = _yolo_out([a1, a2, a3], (h, w), input_shape, conf_thresh)
-
-            # for _idx in range(3):   # 大中小感受野排列(13, 13, 255), (26, 26, 255), (52, 52, 255)
-            #     # print(outs2[_idx].shape)
-            #     pred_xywh_l, pred_conf_l, pred_prob_l = decode_np(output_l, anchors[2], 32, num_classes, conf_thresh)
-            #     pred_xywh_m, pred_conf_m, pred_prob_m = decode_np(output_m, anchors[1], 16, num_classes, conf_thresh)
-            #     pred_xywh_s, pred_conf_s, pred_prob_s = decode_np(output_s, anchors[0], 8, num_classes, conf_thresh)
+            # 上面注释掉，解锁这些，看速度上限。
+            boxes = np.zeros((1, 4), 'float32')
+            scores = np.zeros((1, ), 'float32') - 2.0
+            classes = np.zeros((1, ), 'int32')
         # 后处理那里，一定不会返回空。若没有物体，scores[0]会是负数，由此来判断有没有物体。
         if scores[0] < 0:
             if isinstance(image, str):
