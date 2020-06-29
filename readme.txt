@@ -52,6 +52,7 @@ python export_model.py
 python deploy_infer.py --model_dir inference_model --image_dir images/test/
 
 
+
 用导出后的模型预测视频：
 python deploy_infer.py --model_dir inference_model --video_file D://PycharmProjects/moviepy/dddd.mp4
 

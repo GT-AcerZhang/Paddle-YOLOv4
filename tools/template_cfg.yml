@@ -2,6 +2,7 @@ arch: YOLOv4
 min_subgraph_size: ${min_subgraph_size}
 use_python_inference: ${use_python_inference}
 mode: ${mode}
+postprocess: ${postprocess}
 draw_threshold: ${draw_threshold}
 metric: COCO
 with_background: false

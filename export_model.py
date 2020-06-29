@@ -127,7 +127,7 @@ if __name__ == '__main__':
     # classes_path = 'data/voc_classes.txt'
     classes_path = 'data/coco_classes.txt'
     # 导出哪个模型
-    model_path = './weights/1'
+    model_path = './weights/66000'
 
     # 推理模型输入图片大小。input_shape越大，精度会上升，但速度会下降。
     # input_shape = (320, 320)
@@ -137,11 +137,20 @@ if __name__ == '__main__':
     # 推理模型保存目录
     save_dir = 'inference_model'
 
-    # 推理时的分数阈值和nms_iou阈值。注意，这些值会写死进模型，如需修改请重新导出模型。
-    conf_thresh = 0.05
-    nms_thresh = 0.45
-    keep_top_k = 100
-    nms_top_k = 100
+    # 导出时用fastnms还是不后处理
+    postprocess = 'fastnms'
+    # postprocess = 'numpy_nms'
+
+    if postprocess == 'fastnms':
+    # 导出时若使用fastnms，则是否用fluid.layers.yolo_box()来对预测框解码。
+        use_yolo_box = True
+
+        # 导出时若使用fastnms，一些相关的阈值
+        # 推理时的分数阈值和nms_iou阈值。注意，这些值会写死进模型，如需修改请重新导出模型。
+        conf_thresh = 0.05
+        nms_thresh = 0.45
+        keep_top_k = 100
+        nms_top_k = 100
 
     # need 3 for YOLO arch
     min_subgraph_size = 3
@@ -179,20 +188,37 @@ if __name__ == '__main__':
     with fluid.program_guard(infer_prog, startup_prog):
         with fluid.unique_name.guard():
             inputs = P.data(name='image', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
-            resize_shape = P.data(name='resize_shape', shape=[-1, 2], append_batch_size=False, dtype='int32')
-            origin_shape = P.data(name='origin_shape', shape=[-1, 2], append_batch_size=False, dtype='int32')
 
-            # 输入字典
-            feed_vars = [('image', inputs), ('resize_shape', resize_shape), ('origin_shape', origin_shape)]
-            feed_vars = OrderedDict(feed_vars)
+            if postprocess == 'fastnms':
+                resize_shape = P.data(name='resize_shape', shape=[-1, 2], append_batch_size=False, dtype='int32')
+                origin_shape = P.data(name='origin_shape', shape=[-1, 2], append_batch_size=False, dtype='int32')
+                param = {}
+                param['resize_shape'] = resize_shape
+                param['origin_shape'] = origin_shape
+                param['anchors'] = anchors
+                param['conf_thresh'] = conf_thresh
+                param['nms_thresh'] = nms_thresh
+                param['keep_top_k'] = keep_top_k
+                param['nms_top_k'] = nms_top_k
+                param['use_yolo_box'] = use_yolo_box
+                # 输入字典
+                feed_vars = [('image', inputs), ('resize_shape', resize_shape), ('origin_shape', origin_shape)]
+                feed_vars = OrderedDict(feed_vars)
+            if postprocess == 'numpy_nms':
+                param = None
+                # 输入字典
+                feed_vars = [('image', inputs), ]
+                feed_vars = OrderedDict(feed_vars)
 
-            boxes, scores, classes = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, fast=True, resize_shape=resize_shape, origin_shape=origin_shape,
-                                                  anchors=anchors, conf_thresh=conf_thresh, nms_thresh=nms_thresh, keep_top_k=keep_top_k, nms_top_k=nms_top_k)
+            boxes, scores, classes = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, postprocess=postprocess, param=param)
             test_fetches = {'boxes': boxes, 'scores': scores, 'classes': classes, }
     infer_prog = infer_prog.clone(for_test=True)
     place = fluid.CPUPlace()
     exe = fluid.Executor(place)
     exe.run(startup_prog)
+
+
+    logger.info("postprocess: %s" % postprocess)
 
     load_params(exe, infer_prog, model_path)
 
@@ -205,6 +231,7 @@ if __name__ == '__main__':
     cfg['min_subgraph_size'] = min_subgraph_size
     cfg['use_python_inference'] = use_python_inference
     cfg['mode'] = mode
+    cfg['postprocess'] = postprocess
     cfg['draw_threshold'] = draw_threshold
     cfg['input_shape_h'] = input_shape_h
     cfg['input_shape_w'] = input_shape_w

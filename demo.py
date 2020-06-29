@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # 6G的卡，训练时如果要预测，则设置use_gpu = False，否则显存不足。
 use_gpu = False
-use_gpu = True
+# use_gpu = True
 
 
 if __name__ == '__main__':
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     classes_path = 'data/coco_classes.txt'
     # model_path可以是'yolov4'、'./weights/1000'这些。
     model_path = 'yolov4'
-    model_path = './weights/1000'
+    model_path = './weights/66000'
 
     # input_shape越大，精度会上升，但速度会下降。
     # input_shape = (320, 320)

@@ -23,6 +23,9 @@ from PIL import Image
 import cv2
 import numpy as np
 import paddle.fluid as fluid
+
+from config import PostprocessNumpyNMSConfig
+from tools.postprocess_np import _yolo_out
 from tools.visualize import visualize_box_mask, get_colors, draw
 
 
@@ -290,6 +293,7 @@ class Config():
         self.use_python_inference = yml_conf['use_python_inference']
         self.min_subgraph_size = yml_conf['min_subgraph_size']
         self.mode = yml_conf['mode']
+        self.postprocess = yml_conf['postprocess']
         self.draw_threshold = yml_conf['draw_threshold']
         self.labels = yml_conf['label_list']
         self.mask_resolution = None
@@ -315,6 +319,7 @@ class Config():
         print('%s: %s' % ('Use Paddle Executor', self.use_python_inference))
         print('%s: %d' % ('min_subgraph_size', self.min_subgraph_size))
         print('%s: %s' % ('mode', self.mode))
+        print('%s: %s' % ('postprocess', self.postprocess))
         print('%s: %f' % ('draw_threshold', self.draw_threshold))
         print('%s: ' % ('Transform Order'))
         for op_info in self.preprocess_infos:
@@ -513,6 +518,76 @@ class Detector():
             results = self.postprocess(boxes, scores, classes, im_info, threshold=threshold)
         return results
 
+    def predict_with_postprocess(self, image, threshold, pcfg):
+        inputs, im_info = self.preprocess(image)
+        np_boxes, np_masks = None, None
+
+        # 如果用python预测。
+        if self.config.use_python_inference:
+            pass
+
+        # 如果用C++预测。
+        else:
+            # 填写输入张量
+            input_names = self.predictor.get_input_names()
+            for i in range(len(input_names)):
+                input_tensor = self.predictor.get_input_tensor(input_names[i])
+                input_tensor.copy_from_cpu(inputs[input_names[i]])
+
+            self.predictor.zero_copy_run()
+            output_names = self.predictor.get_output_names()
+
+            # 根据output_names看不出哪个输出是boxes 哪个输出是scores 哪个输出是classes
+            outs0 = self.predictor.get_output_tensor(output_names[0])
+            outs1 = self.predictor.get_output_tensor(output_names[1])
+            outs2 = self.predictor.get_output_tensor(output_names[2])
+            outs0 = outs0.copy_to_cpu()[0]
+            outs1 = outs1.copy_to_cpu()[0]
+            outs2 = outs2.copy_to_cpu()[0]
+
+            # 在这里后处理
+            # output_l, output_m, output_s = 1
+            # 识别哪个输出是output_l 哪个输出是output_m 哪个输出是output_s
+            n_grids = []
+            outs = [outs0, outs1, outs2]
+            for i, o in enumerate(outs):
+                n_grids.append(o.shape[0])
+            n_grids = np.array(n_grids, 'int32')
+            idx = np.argsort(n_grids)
+            n_grids = n_grids[idx]
+            outs2 = []
+            for _idx in idx:
+                outs2.append(outs[_idx])
+
+            # pred_xywh_list = []
+            # pred_conf_list = []
+            # pred_prob_list = []
+            conf_thresh = pcfg.conf_thresh
+
+            num_classes = 80
+            input_shape = (416, 416)
+            a1 = np.reshape(outs2[0], (1, input_shape[0] // 32, input_shape[1] // 32, 3, 5 + num_classes))
+            a2 = np.reshape(outs2[1], (1, input_shape[0] // 16, input_shape[1] // 16, 3, 5 + num_classes))
+            a3 = np.reshape(outs2[2], (1, input_shape[0] // 8, input_shape[1] // 8, 3, 5 + num_classes))
+            h = im_info['origin_shape'][0]
+            w = im_info['origin_shape'][1]
+            # print(im_info)
+            boxes, scores, classes = _yolo_out([a1, a2, a3], (h, w), input_shape, conf_thresh)
+
+            # for _idx in range(3):   # 大中小感受野排列(13, 13, 255), (26, 26, 255), (52, 52, 255)
+            #     # print(outs2[_idx].shape)
+            #     pred_xywh_l, pred_conf_l, pred_prob_l = decode_np(output_l, anchors[2], 32, num_classes, conf_thresh)
+            #     pred_xywh_m, pred_conf_m, pred_prob_m = decode_np(output_m, anchors[1], 16, num_classes, conf_thresh)
+            #     pred_xywh_s, pred_conf_s, pred_prob_s = decode_np(output_s, anchors[0], 8, num_classes, conf_thresh)
+        # 后处理那里，一定不会返回空。若没有物体，scores[0]会是负数，由此来判断有没有物体。
+        if scores[0] < 0:
+            if isinstance(image, str):
+                print('[WARNNING] No object detected in %s.' % image)
+            results = {'boxes': np.array([])}
+        else:
+            results = self.postprocess(boxes, scores, classes, im_info, threshold=threshold)
+        return results
+
 
 
 def predict_images():
@@ -527,6 +602,10 @@ def predict_images():
         # os.makedirs(FLAGS.output_dir)
         if not os.path.exists(FLAGS.output_dir): os.makedirs(FLAGS.output_dir)
 
+        postprocess = config.postprocess
+        if postprocess == 'numpy_nms':
+            pcfg = PostprocessNumpyNMSConfig()
+
 
         # 获取颜色
         num_classes = len(detector.config.labels)
@@ -537,7 +616,10 @@ def predict_images():
         if FLAGS.use_gpu:
             for k, filename in enumerate(path_dir):
                 img_path = FLAGS.image_dir + filename
-                results = detector.predict(img_path, detector.config.draw_threshold)
+                if postprocess == 'fastnms':
+                    results = detector.predict(img_path, detector.config.draw_threshold)
+                elif postprocess == 'numpy_nms':
+                    results = detector.predict_with_postprocess(img_path, detector.config.draw_threshold, pcfg)
                 if k == 10:
                     break
 
@@ -546,7 +628,10 @@ def predict_images():
 
         for k, filename in enumerate(path_dir):
             img_path = FLAGS.image_dir + filename
-            results = detector.predict(img_path, detector.config.draw_threshold)
+            if postprocess == 'fastnms':
+                results = detector.predict(img_path, detector.config.draw_threshold)
+            elif postprocess == 'numpy_nms':
+                results = detector.predict_with_postprocess(img_path, detector.config.draw_threshold, pcfg)
             image = cv2.imread(img_path)
             if len(results['boxes']) > 0:
                 draw(image, results['boxes'], results['scores'], results['classes'], detector.config.labels, colors)

@@ -141,8 +141,8 @@ def decode(conv_output, anchors, stride, num_class, conf_thresh):
 
 
 def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, trainable=True,
-           fast=False, resize_shape=None, origin_shape=None, anchors=None, conf_thresh=0.05, nms_thresh=0.45,
-           keep_top_k=100, nms_top_k=100):
+           postprocess='numpy_nms', param=None):
+    assert postprocess in ['numpy_nms', 'fastnms'], "postprocess valid."
     i32 = initial_filters
     i64 = i32 * 2
     i128 = i32 * 4
@@ -150,14 +150,8 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
     i512 = i32 * 16
     i1024 = i32 * 32
 
-    if fast:
-        # x = PreLayer()(inputs)
-        x = inputs
-    else:
-        x = inputs
-
     # cspdarknet53部分
-    x = conv2d_unit(x, i32, 3, stride=1, padding=1, name='conv001', is_test=is_test, trainable=trainable)
+    x = conv2d_unit(inputs, i32, 3, stride=1, padding=1, name='conv001', is_test=is_test, trainable=trainable)
 
     # ============================= s2 =============================
     x = conv2d_unit(x, i64, 3, stride=2, padding=1, name='conv002', is_test=is_test, trainable=trainable)
@@ -268,12 +262,18 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
                            is_test=is_test, trainable=trainable)
 
     # 用张量操作实现后处理
-    if fast:
+    if postprocess == 'fastnms':
+        resize_shape = param['resize_shape']
+        origin_shape = param['origin_shape']
+        anchors = param['anchors']
+        conf_thresh = param['conf_thresh']
+        nms_thresh = param['nms_thresh']
+        keep_top_k = param['keep_top_k']
+        nms_top_k = param['nms_top_k']
+        use_yolo_box = param['use_yolo_box']
+
+
         # 先对坐标解码
-
-        use_yolo_box = True
-        # use_yolo_box = False
-
         # 第一种方式。慢一点，但支持修改。
         if not use_yolo_box:
             # 相当于numpy的transpose()，交换下标

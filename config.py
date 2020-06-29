@@ -78,6 +78,22 @@ class TrainConfig(object):
 
 
 
+class PostprocessNumpyNMSConfig(object):
+    """
+    deploy_infer.py后处理配置
+    """
+    def __init__(self):
+        self.anchors = [[12, 16], [19, 36], [40, 28],
+                        [36, 75], [76, 55], [72, 146],
+                        [142, 110], [192, 243], [459, 401]]
+        self.conf_thresh = 0.05
+        self.nms_thresh = 0.45
+        self.keep_top_k = 100
+        self.nms_top_k = 100
+        self.nms_top_k = 100
+
+
+
 class TrainConfig_2(object):
     """
     其它配置
