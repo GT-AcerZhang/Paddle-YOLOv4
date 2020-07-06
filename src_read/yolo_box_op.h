@@ -57,25 +57,22 @@ HOSTDEVICE inline void GetYoloBox(T* box, const T* x, const int* anchors, int i,
 // an_num 就是 3
 // an_stride 就是 85*13*13
 // stride 就是 13*13
-// 实际上输出张量input是一个一维数组（指针），所以将坐标[i, j, entry, k, l]转换成真实位置
+// 实际上输入张量input是一个一维数组（指针），所以将坐标[i, j, entry, k, l]转换成真实位置
 HOSTDEVICE inline int GetEntryIndex(int batch, int an_idx, int hw_idx,
                                     int an_num, int an_stride, int stride,
                                     int entry) {
   return (batch * an_num + an_idx) * an_stride + entry * stride + hw_idx;
 }
 
-// aaaaaaaaa，
-// aaaaaaaaa，
-// aaaaaaaaa，
-// aaaaaaaaa，
-// aaaaaaaaa，
-// aaaaaaaaa，
-// aaaaaaaaa，
-// aaaaaaaaa，
+// boxes，输出张量，形状是[bz, 3, 13, 13, 4]，实际上输出张量boxes是一个一维数组（指针）
+// box，T box[4]，一个长度为4的一维数组
+// box_idx，将box写入到boxes的box_idx处。写入的坐标格式是x1y1x2y2
+// clip_bbox，是否把x1y1x2y2限制在图片内。
 template <typename T>
 HOSTDEVICE inline void CalcDetectionBox(T* boxes, T* box, const int box_idx,
                                         const int img_height,
                                         const int img_width, bool clip_bbox) {
+  // 写入的坐标格式是x1y1x2y2
   boxes[box_idx] = box[0] - box[2] / 2;
   boxes[box_idx + 1] = box[1] - box[3] / 2;
   boxes[box_idx + 2] = box[0] + box[2] / 2;
@@ -94,12 +91,22 @@ HOSTDEVICE inline void CalcDetectionBox(T* boxes, T* box, const int box_idx,
   }
 }
 
+// scores，输出张量，形状是[bz, 3, 13, 13, 80]，实际上输出张量scores是一个一维数组（指针）
+// input，输入张量，形状是[bz, 3, 85, 13, 13]，实际上输入张量input是一个一维数组（指针）
+// label_idx，把80位条件概率从input的label_idx处取出
+// score_idx，写进scores的score_idx处
+// class_num，80
+// conf，置信位，已经经过sigmoid()激活
+// stride，13*13，网格数
 template <typename T>
 HOSTDEVICE inline void CalcLabelScore(T* scores, const T* input,
                                       const int label_idx, const int score_idx,
                                       const int class_num, const T conf,
                                       const int stride) {
+  // 写80位分数，分数=置信位*条件概率
   for (int i = 0; i < class_num; i++) {
+    // scores，输出张量，形状是[bz, 3, 13, 13, 80]
+    // input，输入张量，形状是[bz, 3, 85, 13, 13]
     scores[score_idx + i] = conf * sigmoid<T>(input[label_idx + i * stride]);
   }
 }
