@@ -278,6 +278,11 @@ The required data format for this layer is one of the following:
 
 // CPU、CUDA共享Kernel实现在.h 文件中，否则，CPU 实现在.cc 文件中，CUDA 实现在.cu 文件中。
 
+/*
+1.BN的计算就是把每个通道的NHW单独拿出来归一化处理
+2.针对每个channel我们都有一组γ,β，所以可学习的参数为2*C
+3.当batch size越小，BN的表现效果也越不好，因为计算过程中所得到的均值和方差不能代表全局
+*/
 // 前向。C++的前向
 template <typename T>
 class BatchNormKernel<platform::CPUDeviceContext, T>
