@@ -163,10 +163,10 @@ class YoloBoxOpCUDAKernel : public framework::OpKernel<T> {
     memory::Copy(gplace, anchors_data, cplace, anchors.data(), bytes,
                  dev_ctx.stream());
 
-    const T* input_data = input->data<T>();   // 获得输入张量input的指针，形状是[bz, 255, 13, 13]
-    const int* imgsize_data = img_size->data<int>();   // 获得输入张量img_size张量的指针，形状是[bz, 2]
-    T* boxes_data = boxes->mutable_data<T>({n, box_num, 4}, ctx.GetPlace());   // 获得输出张量boxes的指针
-    T* scores_data = scores->mutable_data<T>({n, box_num, class_num}, ctx.GetPlace());   // 获得输出张量scores的指针
+    const T* input_data = input->data<T>();   // 获得输入张量input的指针，形状是[bz, 255, 13, 13]            调用data()函数获取指针
+    const int* imgsize_data = img_size->data<int>();   // 获得输入张量img_size张量的指针，形状是[bz, 2]       调用data()函数获取指针
+    T* boxes_data = boxes->mutable_data<T>({n, box_num, 4}, ctx.GetPlace());   // 获得输出张量boxes的指针       调用mutable_data()函数获取指针，并且指定形状
+    T* scores_data = scores->mutable_data<T>({n, box_num, class_num}, ctx.GetPlace());   // 获得输出张量scores的指针   调用mutable_data()函数获取指针，并且指定形状
     math::SetConstant<platform::CUDADeviceContext, T> set_zero;
     set_zero(dev_ctx, boxes, static_cast<T>(0));   // 将boxes初始化为0
     set_zero(dev_ctx, scores, static_cast<T>(0));  // 将scores初始化为0

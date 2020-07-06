@@ -20,6 +20,7 @@ namespace operators {
 
 using Tensor = framework::Tensor;
 
+// 模板T
 template <typename T>
 HOSTDEVICE inline T sigmoid(T x) {
   return 1.0 / (1.0 + std::exp(-x));
