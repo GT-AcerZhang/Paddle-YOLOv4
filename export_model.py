@@ -142,7 +142,7 @@ if __name__ == '__main__':
     # postprocess = 'numpy_nms'
 
     if postprocess == 'fastnms':
-    # 导出时若使用fastnms，则是否用fluid.layers.yolo_box()来对预测框解码。
+        # 导出时若使用fastnms，则是否用fluid.layers.yolo_box()来对预测框解码。
         use_yolo_box = True
 
         # 导出时若使用fastnms，一些相关的阈值

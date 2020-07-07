@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # 6G的卡，训练时如果要预测，则设置use_gpu = False，否则显存不足。
 use_gpu = False
-# use_gpu = True
+use_gpu = True
 
 
 if __name__ == '__main__':
