@@ -76,6 +76,7 @@ inline void ResizeToChannelFirst(const framework::ExecutionContext& context,
   }
 }
 
+// 把通道放到最前（批大小还是更前）
 template <typename DeviceContext, typename T>
 inline void TransToChannelFirst(const framework::ExecutionContext& context,
                                 const Tensor* input,
@@ -87,7 +88,7 @@ inline void TransToChannelFirst(const framework::ExecutionContext& context,
     math::Transpose<DeviceContext, T, 5> trans5;
     trans5(dev_ctx, *input, transformed_input, axis);
 
-  } else if (dim == 2) {
+  } else if (dim == 2) {   // 卷积网络4维张量，就是这个了
     auto& dev_ctx = context.template device_context<DeviceContext>();
     std::vector<int> axis{0, 3, 1, 2};
     math::Transpose<DeviceContext, T, 4> trans4;
@@ -100,6 +101,8 @@ inline void TransToChannelFirst(const framework::ExecutionContext& context,
   }
 }
 
+
+// 把通道放到最后
 template <typename DeviceContext, typename T>
 inline void TransToChannelLast(const framework::ExecutionContext& context,
                                const Tensor* input, Tensor* transformed_input) {
@@ -110,7 +113,7 @@ inline void TransToChannelLast(const framework::ExecutionContext& context,
     math::Transpose<DeviceContext, T, 5> trans5;
     trans5(dev_ctx, *input, transformed_input, axis);
 
-  } else if (dim == 2) {
+  } else if (dim == 2) {   // 卷积网络4维张量，就是这个了
     auto& dev_ctx = context.template device_context<DeviceContext>();
     std::vector<int> axis{0, 2, 3, 1};
     math::Transpose<DeviceContext, T, 4> trans4;

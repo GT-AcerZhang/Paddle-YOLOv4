@@ -286,6 +286,11 @@ The required data format for this layer is one of the following:
 3.当batch size越小，BN的表现效果也越不好，因为计算过程中所得到的均值和方差不能代表全局
 
 全局平均池化是拿HW计算，得到的结果形状是(N, C)；而bn拿多了一个N，得到的均值结果形状是(C, )
+
+其他：
+https://blog.csdn.net/ygfrancois/article/details/90382459
+
+权重的偏导数用于更新自己，输入的偏导数用于更新前面的层的权重。
 */
 // 前向。C++的前向
 template <typename T>
@@ -294,10 +299,10 @@ class BatchNormKernel<platform::CPUDeviceContext, T>
  public:
   void Compute(const framework::ExecutionContext &ctx) const override {
     const float epsilon = ctx.Attr<float>("epsilon");
-    float momentum = ctx.Attr<float>("momentum");
+    float momentum = ctx.Attr<float>("momentum");   // 0.9
     const bool is_test = ctx.Attr<bool>("is_test");
-    const bool use_global_stats = ctx.Attr<bool>("use_global_stats");
-    const bool trainable_stats = ctx.Attr<bool>("trainable_statistics");
+    const bool use_global_stats = ctx.Attr<bool>("use_global_stats");      // False
+    const bool trainable_stats = ctx.Attr<bool>("trainable_statistics");   // False?
     bool test_mode = is_test && (!trainable_stats);
 
     bool global_stats = test_mode || use_global_stats;
@@ -320,41 +325,44 @@ class BatchNormKernel<platform::CPUDeviceContext, T>
             "The size of input X's dimensions should be less than 6."
             "But received: the size of input X's dimensionss is [%d]",
             x_dims.size()));
-    const int N = x_dims[0];
-    const int C =
+    const int N = x_dims[0];   // 批大小N
+    const int C =   // 通道数C
         (data_layout == DataLayout::kNCHW ? x_dims[1]
                                           : x_dims[x_dims.size() - 1]);
-    const int sample_size = x->numel() / N / C;
+    const int sample_size = x->numel() / N / C;   // sample_size == H*W
 
     auto *y = ctx.Output<Tensor>("Y");
 
-    auto *mean_out = ctx.Output<Tensor>("MeanOut");
-    auto *variance_out = ctx.Output<Tensor>("VarianceOut");
-    auto *saved_mean = ctx.Output<Tensor>("SavedMean");
-    auto *saved_variance = ctx.Output<Tensor>("SavedVariance");
+    auto *mean_out = ctx.Output<Tensor>("MeanOut");              // 历史均值，以下代码会更新它
+    auto *variance_out = ctx.Output<Tensor>("VarianceOut");      // 历史方差，以下代码会更新它
+    auto *saved_mean = ctx.Output<Tensor>("SavedMean");          // 当前批的均值
+    auto *saved_variance = ctx.Output<Tensor>("SavedVariance");  // 当前批的方差。上面的AddOutput("SavedVariance", ...)已经有英文注释了。训练的时候用的是这个方差来归一化，而不是用历史方差。
+
+    //  涉及到3个方差："Variance", "VarianceOut", "SavedVariance"
+
 
     // alloc memory
-    y->mutable_data<T>(ctx.GetPlace());
-    mean_out->mutable_data<T>(ctx.GetPlace());
-    variance_out->mutable_data<T>(ctx.GetPlace());
-    saved_mean->mutable_data<T>(ctx.GetPlace());
-    saved_variance->mutable_data<T>(ctx.GetPlace());
+    y->mutable_data<T>(ctx.GetPlace());               // 调用mutable_data()函数获取指针，可以指定形状
+    mean_out->mutable_data<T>(ctx.GetPlace());        // 调用mutable_data()函数获取指针，可以指定形状
+    variance_out->mutable_data<T>(ctx.GetPlace());    // 调用mutable_data()函数获取指针，可以指定形状
+    saved_mean->mutable_data<T>(ctx.GetPlace());      // 调用mutable_data()函数获取指针，可以指定形状
+    saved_variance->mutable_data<T>(ctx.GetPlace());  // 调用mutable_data()函数获取指针，可以指定形状
 
-    if (!global_stats) {
+    if (!global_stats) {   // 如果是训练状态
       // saved_xx is use just in this batch of data
-      EigenVectorArrayMap<T> saved_mean_e(
+      EigenVectorArrayMap<T> saved_mean_e(   // 当前批的均值
           saved_mean->mutable_data<T>(ctx.GetPlace()), C);
-      EigenVectorArrayMap<T> saved_variance_e(
+      EigenVectorArrayMap<T> saved_variance_e(   // 当前批的方差
           saved_variance->mutable_data<T>(ctx.GetPlace()), C);
-      saved_mean_e.setZero();
-      saved_variance_e.setZero();
+      saved_mean_e.setZero();       // 当前批的均值设为0
+      saved_variance_e.setZero();   // 当前批的方差设为0
 
-      EigenVectorArrayMap<T> running_mean_arr(
+      EigenVectorArrayMap<T> running_mean_arr(  // 历史均值
           mean_out->mutable_data<T>(ctx.GetPlace()), C);
-      EigenVectorArrayMap<T> running_var_arr(
+      EigenVectorArrayMap<T> running_var_arr(   // 历史方差
           variance_out->mutable_data<T>(ctx.GetPlace()), C);
 
-      if ((N * sample_size) == 1) {
+      if ((N * sample_size) == 1) {   // 如果N * H*W == 1，直接输出
         // Only 1 element in normalization dimension,
         // we skip the batch norm calculation, let y = x.
         framework::TensorCopy(*x, ctx.GetPlace(), y);
@@ -362,17 +370,17 @@ class BatchNormKernel<platform::CPUDeviceContext, T>
       }
 
       switch (data_layout) {
-        case DataLayout::kNCHW: {
+        case DataLayout::kNCHW: {   // 默认是这个
           ConstEigenArrayMap<T> x_arr(x->data<T>(), sample_size, N * C);
-          for (int nc = 0; nc < N * C; ++nc) {
-            saved_mean_e(nc % C) += x_arr.col(nc).sum();
+          for (int nc = 0; nc < N * C; ++nc) {  // 遍历每一个样本的每一个通道
+            saved_mean_e(nc % C) += x_arr.col(nc).sum();  // saved_mean_e[nc % C] = np.sum(x_arr[n, c, :, :])   对WH维求和。saved_mean_e长度是C，有C个和。
           }
-          saved_mean_e /= N * sample_size;
+          saved_mean_e /= N * sample_size;  // C个和除以数量 得到了C个均值
           for (int nc = 0; nc < N * C; ++nc) {
             saved_variance_e(nc % C) +=
                 (x_arr.col(nc) - saved_mean_e(nc % C)).matrix().squaredNorm();
           }
-          saved_variance_e /= N * sample_size;
+          saved_variance_e /= N * sample_size;  // C个方差
           break;
         }
         case DataLayout::kNHWC: {
@@ -392,6 +400,8 @@ class BatchNormKernel<platform::CPUDeviceContext, T>
           PADDLE_THROW("Unknown storage order: %s", data_layout_str);
       }
 
+
+      // 默认 momentum==0.9
       // if MomentumTensor is set, use MomentumTensor value, momentum
       // is only used in this training branch
       if (ctx.HasInput("MomentumTensor")) {
@@ -399,6 +409,7 @@ class BatchNormKernel<platform::CPUDeviceContext, T>
         momentum = mom_tensor->data<float>()[0];
       }
 
+      // running_mean_arr是历史均值，比重占0.9，saved_mean_e是这一批的均值，比重是0.1
       running_mean_arr =
           running_mean_arr * momentum + saved_mean_e * (1. - momentum);
       running_var_arr =
@@ -407,25 +418,26 @@ class BatchNormKernel<platform::CPUDeviceContext, T>
 
     // use SavedMean and SavedVariance to do normalize
     Eigen::Array<T, Eigen::Dynamic, 1> inv_std(C);
-    if (global_stats) {
+    if (global_stats) {   // 如果是预测状态，用的是全局的均值、方差来归一化。
       ConstEigenVectorArrayMap<T> var_arr(
           ctx.Input<Tensor>("Variance")->data<T>(), C);
       inv_std = (var_arr + epsilon).sqrt().inverse();
-    } else {
+    } else {   // 如果是训练状态，用的是当前批的均值、方差来归一化。
+      // 上面的AddOutput("SavedVariance", ...)已经有英文注释了。训练的时候用的是这个方差来归一化，而不是用历史方差。
       EigenVectorArrayMap<T> saved_inv_std(
           ctx.Output<Tensor>("SavedVariance")->data<T>(), C);
       // inverse SavedVariance first, gradient will use it too.
-      saved_inv_std = (saved_inv_std + epsilon).inverse().sqrt();
-      inv_std = saved_inv_std;
+      saved_inv_std = (saved_inv_std + epsilon).inverse().sqrt();   // 得到标准差的倒数
+      inv_std = saved_inv_std;   // 标准差的倒数
     }
     ConstEigenVectorArrayMap<T> mean_arr(
-        global_stats ? ctx.Input<Tensor>("Mean")->data<T>()
-                     : ctx.Output<Tensor>("SavedMean")->data<T>(),
+        global_stats ? ctx.Input<Tensor>("Mean")->data<T>()         // 如果是预测状态，用的是全局的均值来归一化。
+                     : ctx.Output<Tensor>("SavedMean")->data<T>(),  // 如果是训练状态，用的是当前批的均值来归一化。
         C);
 
-    //   ((x - est_mean) * (inv_var) * scale + bias
-    //   formula transform ====>
-    //   (x * inv_var * scale) + (bias - est_mean * inv_var * scale)
+    //   ((x - est_mean) * (inv_std) * scale + bias
+    //   formula transform ====> 去括号之后，得到输出的表达式
+    //   (x * inv_std * scale) + (bias - est_mean * inv_std * scale)
     const auto *scale = ctx.Input<Tensor>("Scale");
     const auto *bias = ctx.Input<Tensor>("Bias");
     ConstEigenVectorArrayMap<T> scale_arr(scale->data<T>(), C);
@@ -435,12 +447,12 @@ class BatchNormKernel<platform::CPUDeviceContext, T>
         bias_arr - mean_arr * inv_std * scale_arr;
 
     switch (data_layout) {
-      case DataLayout::kNCHW: {
-        EigenArrayMap<T> y_arr(y->mutable_data<T>(ctx.GetPlace()), sample_size,
-                               N * C);
-        ConstEigenArrayMap<T> x_arr(x->data<T>(), sample_size, N * C);
-        for (int nc = 0; nc < N * C; ++nc) {
-          y_arr.col(nc) = x_arr.col(nc) * new_scale(nc % C) + new_bias(nc % C);
+      case DataLayout::kNCHW: {   // 默认是这个
+        //                                 x_arr、y_arr  的形状都是         [N*C, H, W]
+        EigenArrayMap<T>      y_arr(y->mutable_data<T>(ctx.GetPlace()), sample_size, N * C);
+        ConstEigenArrayMap<T> x_arr(x->data<T>(),                       sample_size, N * C);
+        for (int nc = 0; nc < N * C; ++nc) {   // 遍历每一个样本的每一个通道
+          y_arr.col(nc) = x_arr.col(nc) * new_scale(nc % C) + new_bias(nc % C);  // x_arr、y_arr的形状都是[N*C, H, W]
         }
         break;
       }
