@@ -70,26 +70,6 @@ Q群：645796480
 
 AIStudio已经为我们搭建好大部分依赖。
 
-## 我是如何做到43.4mAP（val2017）的
-使用这个仓库训练得到。当你在AIStudio抢到32GB显卡时，可以开batch_size=8；当你在AIStudio抢到16GB显卡时，可以开batch_size=4。
-我在开batch_size=8，不冻结任何层的情况下，训练了245000步之后（中间有把学习率降低到0.00001（停止训练，修改config.py中的self.lr）），
-得到如下结果（input_shape = (608, 608)，分数阈值=0.001，nms阈值=0.45的情况下）：
-```
-Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.434
-Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.661
-Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.472
-Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.279
-Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.486
-Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.539
-Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.330
-Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.529
-Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.561
-Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.403
-Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.609
-Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.665
-```
-还等什么，赶紧star我的Paddle版YOLOv4，去AIStudio抢显卡训练吧！
-
 ## 训练
 下载我从Tianxiaomo的仓库保存下来的pytorch模型yolov4.pt
 链接：https://pan.baidu.com/s/152poRrQW9Na_C8rkhNEh3g
@@ -155,24 +135,6 @@ xxx.jpg 48,240,195,371,11 8,12,352,498,14
 运行完之后，进入results目录，把bbox_detections.json压缩成bbox_detections.zip，提交到
 https://competitions.codalab.org/competitions/20794#participate
 获得bbox mAP.
-
-下面是验证集mAP稳定之后某个模型的test-dev的mAP（input_shape = (608, 608)，分数阈值=0.001，nms阈值=0.45的情况下）：
-```
-Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.410
-Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.625
-Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.447
-Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.236
-Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.445
-Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.509
-Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.322
-Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.510
-Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.538
-Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.359
-Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.577
-Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.651
-```
-
-该mAP是test集的结果（官方精度为43.5%mAP），也就是大部分检测算法论文的标准指标。有点谜，根据我之前的经验test集的mAP和val集的mAP应该是差不多的。原因已经找到，由于原版YOLO v4使用coco trainval2014进行训练，训练样本中包含部分评估样本，若使用val集会导致精度虚高。
 
 ## 预测
 运行demo.py。
