@@ -27,7 +27,7 @@ class YOLOv3(object):
         output_l, output_m, output_s = self.head(body_feats)
         if export:
             # 用张量操作实现后处理
-            if postprocess == 'fastnms':
+            if postprocess == 'fastnms' or postprocess == 'multiclass_nms':
                 resize_shape = param['resize_shape']
                 origin_shape = param['origin_shape']
                 anchors = param['anchors']
@@ -35,9 +35,10 @@ class YOLOv3(object):
                 nms_thresh = param['nms_thresh']
                 keep_top_k = param['keep_top_k']
                 nms_top_k = param['nms_top_k']
-                use_yolo_box = param['use_yolo_box']
-                num_classes = 80
-                num_anchors = 3
+                num_classes = param['num_classes']
+                num_anchors = param['num_anchors']
+
+                use_yolo_box = True
 
                 # 先对坐标解码
                 # 第一种方式。慢一点，但支持修改。
@@ -97,15 +98,28 @@ class YOLOv3(object):
                     scores.append(prob_m)
                     scores.append(prob_s)
                     all_pred_boxes = fluid.layers.concat(boxes, axis=1)  # [batch_size, -1, 4]
-                    # 把x0y0x1y1格式转换成cx_cy_w_h格式
-                    all_pred_boxes = P.concat([(all_pred_boxes[:, :, :2] + all_pred_boxes[:, :, 2:]) * 0.5,
-                                               all_pred_boxes[:, :, 2:] - all_pred_boxes[:, :, :2]], axis=-1)
-                    all_pred_scores = fluid.layers.concat(scores, axis=1)  # [batch_size, -1, 80]
-                    # 官方的multiclass_nms()也更快一点。但是为了之后的深度定制。
+                    if postprocess == 'fastnms':
+                        # 把x0y0x1y1格式转换成cx_cy_w_h格式
+                        all_pred_boxes = P.concat([(all_pred_boxes[:, :, :2] + all_pred_boxes[:, :, 2:]) * 0.5,
+                                                   all_pred_boxes[:, :, 2:] - all_pred_boxes[:, :, :2]], axis=-1)
+                        all_pred_scores = fluid.layers.concat(scores, axis=1)  # [batch_size, -1, 80]
+                    if postprocess == 'multiclass_nms':
+                        # x0y0x1y1格式不用转换成cx_cy_w_h格式
+                        all_pred_scores = fluid.layers.concat(scores, axis=1)  # [batch_size, -1, 80]
+                        all_pred_scores = fluid.layers.transpose(all_pred_scores, perm=[0, 2, 1])
+                # 官方的multiclass_nms()也更快一点。但是为了之后的深度定制。
                 # 用fastnms
-                boxes, scores, classes = fastnms(all_pred_boxes, all_pred_scores, resize_shape, origin_shape, conf_thresh,
-                                                 nms_thresh, keep_top_k, nms_top_k, use_yolo_box)
-                return boxes, scores, classes
+                if postprocess == 'fastnms':
+                    boxes, scores, classes = fastnms(all_pred_boxes, all_pred_scores, resize_shape, origin_shape, conf_thresh,
+                                                     nms_thresh, keep_top_k, nms_top_k, use_yolo_box)
+                    return boxes, scores, classes
+                if postprocess == 'multiclass_nms':
+                    pred = fluid.layers.multiclass_nms(all_pred_boxes, all_pred_scores,
+                                                       score_threshold=conf_thresh,
+                                                       nms_top_k=nms_top_k,
+                                                       keep_top_k=keep_top_k,
+                                                       nms_threshold=nms_thresh)
+                    return pred
 
         # 相当于numpy的transpose()，交换下标
         output_l = fluid.layers.transpose(output_l, perm=[0, 2, 3, 1], name='output_l')

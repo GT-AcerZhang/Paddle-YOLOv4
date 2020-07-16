@@ -453,7 +453,7 @@ class Detector():
         results['classes'] = classes
         return results
 
-    def predict(self, image, threshold=-1.0):
+    def predict_with_fastnms(self, image, threshold=-1.0):
         '''
         Args:
             image (str/np.ndarray): path of image/ np.ndarray read by cv2
@@ -518,7 +518,62 @@ class Detector():
             results = self.postprocess(boxes, scores, classes, im_info, threshold=threshold)
         return results
 
-    def predict_with_postprocess(self, image, threshold, pcfg):
+    def predict_with_multiclass_nms(self, image, threshold=-1.0):
+        '''
+        Args:
+            image (str/np.ndarray): path of image/ np.ndarray read by cv2
+            threshold (float): threshold of predicted box' score
+        Returns:
+            results (dict): include 'boxes': np.ndarray: shape:[N,6], N: number of box,
+                            matix element:[class, score, x_min, y_min, x_max, y_max]
+                            MaskRCNN's results include 'masks': np.ndarray:
+                            shape:[N, class_num, mask_resolution, mask_resolution]
+        '''
+        inputs, im_info = self.preprocess(image)
+        np_boxes, np_masks = None, None
+
+        # 如果用python预测。
+        if self.config.use_python_inference:
+            outs = self.executor.run(self.program,
+                                     feed=inputs,
+                                     fetch_list=self.fecth_targets,
+                                     return_numpy=False)
+            np_boxes = np.array(outs[0][0])
+            np_boxes2 = np.array(outs[1][0])
+            np_boxes3 = np.array(outs[2][0])
+            print(np_boxes.shape)
+            print(np_boxes2.shape)
+            print(np_boxes3.shape)
+            if self.config.mask_resolution is not None:
+                np_masks = np.array(outs[1])
+
+        # 如果用C++预测。
+        else:
+            # 填写输入张量
+            input_names = self.predictor.get_input_names()
+            for i in range(len(input_names)):
+                input_tensor = self.predictor.get_input_tensor(input_names[i])
+                input_tensor.copy_from_cpu(inputs[input_names[i]])
+
+            self.predictor.zero_copy_run()
+            output_names = self.predictor.get_output_names()
+
+            # 根据output_names看不出哪个输出是boxes 哪个输出是scores 哪个输出是classes
+            outs0 = self.predictor.get_output_tensor(output_names[0])
+            outs0 = outs0.copy_to_cpu()
+        # 若没有物体，返回[[]]
+        if np.shape(outs0)[1] == 1:
+            if isinstance(image, str):
+                print('[WARNNING] No object detected in %s.' % image)
+            results = {'boxes': np.array([])}
+        else:
+            boxes = outs0[:, 2:]
+            scores = outs0[:, 1]
+            classes = outs0[:, 0].astype(np.int32)
+            results = self.postprocess(boxes, scores, classes, im_info, threshold=threshold)
+        return results
+
+    def predict_with_numpy_nms(self, image, threshold, pcfg):
         inputs, im_info = self.preprocess(image)
         np_boxes, np_masks = None, None
 
@@ -609,9 +664,11 @@ def predict_images():
             for k, filename in enumerate(path_dir):
                 img_path = FLAGS.image_dir + filename
                 if postprocess == 'fastnms':
-                    results = detector.predict(img_path, detector.config.draw_threshold)
+                    results = detector.predict_with_fastnms(img_path, detector.config.draw_threshold)
                 elif postprocess == 'numpy_nms':
-                    results = detector.predict_with_postprocess(img_path, detector.config.draw_threshold, pcfg)
+                    results = detector.predict_with_numpy_nms(img_path, detector.config.draw_threshold, pcfg)
+                elif postprocess == 'multiclass_nms':
+                    results = detector.predict_with_multiclass_nms(img_path, detector.config.draw_threshold)
                 if k == 10:
                     break
 
@@ -621,9 +678,11 @@ def predict_images():
         for k, filename in enumerate(path_dir):
             img_path = FLAGS.image_dir + filename
             if postprocess == 'fastnms':
-                results = detector.predict(img_path, detector.config.draw_threshold)
+                results = detector.predict_with_fastnms(img_path, detector.config.draw_threshold)
             elif postprocess == 'numpy_nms':
-                results = detector.predict_with_postprocess(img_path, detector.config.draw_threshold, pcfg)
+                results = detector.predict_with_numpy_nms(img_path, detector.config.draw_threshold, pcfg)
+            elif postprocess == 'multiclass_nms':
+                results = detector.predict_with_multiclass_nms(img_path, detector.config.draw_threshold)
             image = cv2.imread(img_path)
             if len(results['boxes']) > 0:
                 draw(image, results['boxes'], results['scores'], results['classes'], detector.config.labels, colors)

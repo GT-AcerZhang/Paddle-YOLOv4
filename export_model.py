@@ -134,12 +134,9 @@ if __name__ == '__main__':
     save_dir = 'inference_model'
 
     # 导出时用fastnms还是不后处理
-    postprocess = 'fastnms'
+    # postprocess = 'fastnms'
+    postprocess = 'multiclass_nms'
     # postprocess = 'numpy_nms'
-
-    # 导出时若使用fastnms，则是否用fluid.layers.yolo_box()来对预测框解码。
-    use_yolo_box = True
-    use_yolo_box = False
 
     # need 3 for YOLO arch
     min_subgraph_size = 3
@@ -197,7 +194,7 @@ if __name__ == '__main__':
         with fluid.unique_name.guard():
             inputs = P.data(name='image', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
 
-            if postprocess == 'fastnms':
+            if postprocess == 'fastnms' or postprocess == 'multiclass_nms':
                 resize_shape = P.data(name='resize_shape', shape=[-1, 2], append_batch_size=False, dtype='int32')
                 origin_shape = P.data(name='origin_shape', shape=[-1, 2], append_batch_size=False, dtype='int32')
                 param = {}
@@ -208,7 +205,8 @@ if __name__ == '__main__':
                 param['nms_thresh'] = nms_thresh
                 param['keep_top_k'] = keep_top_k
                 param['nms_top_k'] = nms_top_k
-                param['use_yolo_box'] = use_yolo_box
+                param['num_classes'] = num_classes
+                param['num_anchors'] = num_anchors
                 # 输入字典
                 feed_vars = [('image', inputs), ('resize_shape', resize_shape), ('origin_shape', origin_shape)]
                 feed_vars = OrderedDict(feed_vars)
@@ -220,13 +218,17 @@ if __name__ == '__main__':
 
             if algorithm == 'YOLOv4':
                 boxes, scores, classes = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, postprocess=postprocess, param=param)
+                test_fetches = {'boxes': boxes, 'scores': scores, 'classes': classes, }
             elif algorithm == 'YOLOv3':
                 backbone = Resnet50Vd()
                 head = YOLOv3Head()
                 yolov3 = YOLOv3(backbone, head)
-                boxes, scores, classes = yolov3(inputs, export=True, postprocess=postprocess, param=param)
-
-            test_fetches = {'boxes': boxes, 'scores': scores, 'classes': classes, }
+                if postprocess == 'fastnms':
+                    boxes, scores, classes = yolov3(inputs, export=True, postprocess=postprocess, param=param)
+                    test_fetches = {'boxes': boxes, 'scores': scores, 'classes': classes, }
+                if postprocess == 'multiclass_nms':
+                    pred = yolov3(inputs, export=True, postprocess=postprocess, param=param)
+                    test_fetches = {'pred': pred, }
     infer_prog = infer_prog.clone(for_test=True)
     place = fluid.CPUPlace()
     exe = fluid.Executor(place)
