@@ -58,8 +58,11 @@ Q群：645796480
 
 2020/06/30:重要提醒：第二次重新训练之后，val2017的mAP没那么高了，在39.5%左右。目前原因正在排查。说一下我第一次训练时的配置：一开始是抢到16GB的显卡，开了批大小=4训练,学习率是0.0001没有用smooth_onehot；后来中断了一次，抢到了32GB的显卡，开了批大小=8，后来，手动调整了学习率为0.00001，加上了smooth_onehot，在245000步时得到那个模型。现在模型也没了。本着不误人子弟的原则，如实相告。这个仓库并不是完美复现，还缺很多trick，有一些是我目前不能解决的，水平有限。对精度要求不是很高的同学可以继续使用。
 
-2020/07/16:加入YOLOv3增强版。见https://github.com/PaddlePaddle/PaddleDetection/blob/release/0.3/docs/featured_model/YOLOv3_ENHANCEMENT.md。
-项目根目录下wget https://paddlemodels.bj.bcebos.com/object_detection/yolov3_r50vd_dcn_obj365_dropblock_iouloss.tar 下载模型。（PS:训练速度是比不上PaddleDetection的，仅研究用）
+2020/07/16:加入YOLOv3增强版。见https://github.com/PaddlePaddle/PaddleDetection/blob/release/0.3/docs/featured_model/YOLOv3_ENHANCEMENT.md
+。项目根目录下
+'''wget https://paddlemodels.bj.bcebos.com/object_detection/yolov3_r50vd_dcn_obj365_dropblock_iouloss.tar
+'''
+下载模型。（PS:训练速度是比不上PaddleDetection的，仅研究用）
 
 ## 需要补充
 
