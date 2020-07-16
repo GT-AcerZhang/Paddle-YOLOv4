@@ -60,8 +60,9 @@ Q群：645796480
 
 2020/07/16:加入YOLOv3增强版。见https://github.com/PaddlePaddle/PaddleDetection/blob/release/0.3/docs/featured_model/YOLOv3_ENHANCEMENT.md
 。项目根目录下
-'''wget https://paddlemodels.bj.bcebos.com/object_detection/yolov3_r50vd_dcn_obj365_dropblock_iouloss.tar
-'''
+```
+wget https://paddlemodels.bj.bcebos.com/object_detection/yolov3_r50vd_dcn_obj365_dropblock_iouloss.tar
+```
 下载模型。（PS:训练速度是比不上PaddleDetection的，仅研究用）
 
 ## 需要补充
