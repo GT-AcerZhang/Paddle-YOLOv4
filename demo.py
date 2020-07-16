@@ -16,6 +16,9 @@ import numpy as np
 import paddle.fluid as fluid
 import paddle.fluid.layers as P
 from tools.cocotools import get_classes
+from model.resnet import Resnet50Vd
+from model.head import YOLOv3Head
+from model.yolov3 import YOLOv3
 from model.yolov4 import YOLOv4
 from model.decode_np import Decode
 
@@ -32,16 +35,24 @@ use_gpu = True
 
 
 if __name__ == '__main__':
+    # 选算法
+    algorithm = 'YOLOv4'
+    # algorithm = 'YOLOv3'
+
     # classes_path = 'data/voc_classes.txt'
     classes_path = 'data/coco_classes.txt'
     # model_path可以是'yolov4'、'./weights/1000'这些。
-    model_path = 'yolov4'
-    model_path = './weights/66000'
+
+    if algorithm == 'YOLOv4':
+        model_path = 'yolov4'
+        model_path = './weights/66000'
+    elif algorithm == 'YOLOv3':
+        model_path = 'yolov3_r50vd_dcn_obj365_dropblock_iouloss'
 
     # input_shape越大，精度会上升，但速度会下降。
     # input_shape = (320, 320)
-    input_shape = (416, 416)
-    # input_shape = (608, 608)
+    # input_shape = (416, 416)
+    input_shape = (608, 608)
 
     # 验证时的分数阈值和nms_iou阈值
     conf_thresh = 0.05
@@ -63,7 +74,13 @@ if __name__ == '__main__':
         with fluid.unique_name.guard():
             # 多尺度训练
             inputs = P.data(name='input_1', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
-            output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
+            if algorithm == 'YOLOv4':
+                output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
+            elif algorithm == 'YOLOv3':
+                backbone = Resnet50Vd()
+                head = YOLOv3Head()
+                yolov3 = YOLOv3(backbone, head)
+                output_l, output_m, output_s = yolov3(inputs)
             eval_fetch_list = [output_l, output_m, output_s]
     eval_prog = eval_prog.clone(for_test=True)
     gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
@@ -82,7 +99,7 @@ if __name__ == '__main__':
     if use_gpu:
         for k, filename in enumerate(path_dir):
             image = cv2.imread('images/test/' + filename)
-            image, boxes, scores, classes = _decode.detect_image(image, eval_fetch_list, draw_image=False)
+            image, boxes, scores, classes = _decode.detect_image(image, eval_fetch_list, algorithm, draw_image=False)
             if k == 10:
                 break
 
@@ -94,7 +111,7 @@ if __name__ == '__main__':
     start = time.time()
     for k, filename in enumerate(path_dir):
         image = cv2.imread('images/test/' + filename)
-        image, boxes, scores, classes = _decode.detect_image(image, eval_fetch_list, draw_image)
+        image, boxes, scores, classes = _decode.detect_image(image, eval_fetch_list, algorithm, draw_image)
 
         # 估计剩余时间
         start_time = end_time

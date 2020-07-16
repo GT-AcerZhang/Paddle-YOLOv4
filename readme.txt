@@ -54,11 +54,11 @@ python deploy_infer.py --model_dir inference_model --image_dir images/test/
 
 
 用导出后的模型预测视频：
-python deploy_infer.py --model_dir inference_model --video_file D://PycharmProjects/moviepy/dddd.mp4
+python deploy_infer.py --model_dir inference_model --video_file D://PycharmProjects/moviepy/che.mp4
 
 
 用导出后的模型播放视频：（按esc键停止播放）
-python deploy_infer.py --model_dir inference_model --play_video D://PycharmProjects/moviepy/dddd.mp4
+python deploy_infer.py --model_dir inference_model --play_video D://PycharmProjects/moviepy/che.mp4
 
 
 

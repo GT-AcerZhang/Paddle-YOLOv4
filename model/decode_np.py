@@ -18,8 +18,8 @@ class Decode(object):
         self.program = program
 
     # 处理一张图片
-    def detect_image(self, image, fetch_list, draw_image):
-        pimage = self.process_image(np.copy(image))
+    def detect_image(self, image, fetch_list, algorithm, draw_image):
+        pimage = self.process_image(np.copy(image), algorithm)
 
         boxes, scores, classes = self.predict(pimage, fetch_list, image.shape)
         if boxes is not None and draw_image:
@@ -122,13 +122,20 @@ class Decode(object):
             cv2.putText(image, bbox_mess, (left, top - 2), cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, (0, 0, 0), 1, lineType=cv2.LINE_AA)
 
-    def process_image(self, img):
+    def process_image(self, img, algorithm):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         h, w = img.shape[:2]
         scale_x = float(self.input_shape[1]) / w
         scale_y = float(self.input_shape[0]) / h
         img = cv2.resize(img, None, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_CUBIC)
-        pimage = img.astype(np.float32) / 255.
+        if algorithm == 'YOLOv4':
+            pimage = img.astype(np.float32) / 255.
+        elif algorithm == 'YOLOv3':
+            # pimage = img.astype(np.float32) / 255.
+            mean = np.array([0.485, 0.456, 0.406])[np.newaxis, np.newaxis, :].astype(np.float32)
+            std = np.array([0.229, 0.224, 0.225])[np.newaxis, np.newaxis, :].astype(np.float32)
+            pimage = img.astype(np.float32) - mean
+            pimage /= std
         pimage = pimage.transpose(2, 0, 1)
         pimage = np.expand_dims(pimage, axis=0)
         return pimage

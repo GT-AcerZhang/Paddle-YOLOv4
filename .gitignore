@@ -18,6 +18,7 @@ __pycache__/
 
 /inference_model/
 /output/
+/yolov3*/
 
 
 *.zip
