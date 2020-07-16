@@ -131,7 +131,7 @@ class YOLOv3_Config_1(object):
         self.lr = 0.0001
         self.batch_size = 8
         # 如果self.pattern = 1，需要指定self.model_path表示从哪个模型读取权重继续训练。
-        self.model_path = 'yolov4'
+        self.model_path = 'yolov3_r50vd_dcn_obj365_dropblock_iouloss'
         # self.model_path = './weights/1000'
 
         # ========= 一些设置 =========
