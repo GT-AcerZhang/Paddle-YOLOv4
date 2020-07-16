@@ -199,9 +199,6 @@ class YOLOv3Head(object):
                         regularizer=L2Decay(0.),
                         name=self.prefix_name +
                              "yolo_output.{}.conv.bias".format(i)))
-
-                # 相当于numpy的transpose()，交换下标
-                block_out = fluid.layers.transpose(block_out, perm=[0, 2, 3, 1])
                 outputs.append(block_out)
 
             # route用于上采样。

@@ -9,13 +9,19 @@
 # ================================================================
 import os
 import tempfile
+import copy
 import shutil
 from collections import OrderedDict
 import numpy as np
 import paddle.fluid as fluid
 import paddle.fluid.layers as P
+
+from model.head import YOLOv3Head
+from model.resnet import Resnet50Vd
+from model.yolov3 import YOLOv3
 from tools.cocotools import get_classes
 from model.yolov4 import YOLOv4
+from config import *
 
 import logging
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
@@ -124,16 +130,6 @@ def dump_infer_config(save_dir, cfg):
 
 
 if __name__ == '__main__':
-    # classes_path = 'data/voc_classes.txt'
-    classes_path = 'data/coco_classes.txt'
-    # 导出哪个模型
-    model_path = './weights/66000'
-
-    # 推理模型输入图片大小。input_shape越大，精度会上升，但速度会下降。
-    # input_shape = (320, 320)
-    input_shape = (416, 416)
-    # input_shape = (608, 608)
-
     # 推理模型保存目录
     save_dir = 'inference_model'
 
@@ -141,16 +137,9 @@ if __name__ == '__main__':
     postprocess = 'fastnms'
     # postprocess = 'numpy_nms'
 
-    if postprocess == 'fastnms':
-        # 导出时若使用fastnms，则是否用fluid.layers.yolo_box()来对预测框解码。
-        use_yolo_box = True
-
-        # 导出时若使用fastnms，一些相关的阈值
-        # 推理时的分数阈值和nms_iou阈值。注意，这些值会写死进模型，如需修改请重新导出模型。
-        conf_thresh = 0.05
-        nms_thresh = 0.45
-        keep_top_k = 100
-        nms_top_k = 100
+    # 导出时若使用fastnms，则是否用fluid.layers.yolo_box()来对预测框解码。
+    use_yolo_box = True
+    use_yolo_box = False
 
     # need 3 for YOLO arch
     min_subgraph_size = 3
@@ -166,18 +155,37 @@ if __name__ == '__main__':
     # 总之，inference_model/infer_cfg.yml里的配置可以手动修改，不需要重新导出模型。
     draw_threshold = -1.0
 
+    # 选择配置
+    cfg = YOLOv4_Config_1()
+    cfg = YOLOv3_Config_1()
+
+
+    # =============== 以下不用设置 ===============
+    algorithm = cfg.algorithm
+    classes_path = cfg.classes_path
+
+    # 读取的模型
+    model_path = cfg.infer_model_path
+
+    # input_shape越大，精度会上升，但速度会下降。
+    input_shape = cfg.infer_input_shape
+
+    # 推理时的分数阈值和nms_iou阈值。注意，这些值会写死进模型，如需修改请重新导出模型。
+    conf_thresh = cfg.infer_conf_thresh
+    nms_thresh = cfg.infer_nms_thresh
+    keep_top_k = cfg.infer_keep_top_k
+    nms_top_k = cfg.infer_nms_top_k
+
 
     # 初始卷积核个数
     initial_filters = 32
     # 先验框
-    anchors = np.array([
-        [[12, 16], [19, 36], [40, 28]],
-        [[36, 75], [76, 55], [72, 146]],
-        [[142, 110], [192, 243], [459, 401]]
-    ])
-    # 一些预处理
-    anchors = anchors.astype(np.float32)
-    num_anchors = len(anchors[0])  # 每个输出层有几个先验框
+    _anchors = copy.deepcopy(cfg.anchors)
+    num_anchors = len(cfg.anchor_masks[0])  # 每个输出层有几个先验框
+    _anchors = np.array(_anchors)
+    _anchors = np.reshape(_anchors, (-1, num_anchors, 2))
+    _anchors = _anchors.astype(np.float32)
+    num_anchors = len(_anchors[0])  # 每个输出层有几个先验框
 
     all_classes = get_classes(classes_path)
     num_classes = len(all_classes)
@@ -195,7 +203,7 @@ if __name__ == '__main__':
                 param = {}
                 param['resize_shape'] = resize_shape
                 param['origin_shape'] = origin_shape
-                param['anchors'] = anchors
+                param['anchors'] = _anchors
                 param['conf_thresh'] = conf_thresh
                 param['nms_thresh'] = nms_thresh
                 param['keep_top_k'] = keep_top_k
@@ -211,6 +219,15 @@ if __name__ == '__main__':
                 feed_vars = OrderedDict(feed_vars)
 
             boxes, scores, classes = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, postprocess=postprocess, param=param)
+
+            if algorithm == 'YOLOv4':
+                boxes, scores, classes = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, postprocess=postprocess, param=param)
+            elif algorithm == 'YOLOv3':
+                backbone = Resnet50Vd()
+                head = YOLOv3Head()
+                yolov3 = YOLOv3(backbone, head)
+                boxes, scores, classes = yolov3(inputs, export=True, postprocess=postprocess, param=param)
+
             test_fetches = {'boxes': boxes, 'scores': scores, 'classes': classes, }
     infer_prog = infer_prog.clone(for_test=True)
     place = fluid.CPUPlace()
@@ -220,9 +237,12 @@ if __name__ == '__main__':
 
     logger.info("postprocess: %s" % postprocess)
 
+    logger.info("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq22222.")
     load_params(exe, infer_prog, model_path)
+    logger.info("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq3333333.")
 
     save_infer_model(save_dir, exe, feed_vars, test_fetches, infer_prog)
+    logger.info("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq333333ttttttttttttttt3.")
 
     # 导出配置文件
     cfg = {}
@@ -236,6 +256,7 @@ if __name__ == '__main__':
     cfg['input_shape_h'] = input_shape_h
     cfg['input_shape_w'] = input_shape_w
     cfg['class_names'] = all_classes
+    logger.info("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq.")
     dump_infer_config(save_dir, cfg)
     logger.info("Done.")
 

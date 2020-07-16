@@ -92,6 +92,8 @@ class YOLOv4_Config_1(object):
         # 推理时的分数阈值和nms_iou阈值
         self.infer_conf_thresh = 0.05
         self.infer_nms_thresh = 0.45
+        self.infer_keep_top_k = 100
+        self.infer_nms_top_k = 100
 
         # 是否给图片画框。
         self.infer_draw_image = True
@@ -173,6 +175,7 @@ class YOLOv3_Config_1(object):
         # ============= 推理时相关 =============
         # 读取的模型
         self.infer_model_path = 'yolov3_r50vd_dcn_obj365_dropblock_iouloss'
+        # self.infer_model_path = './weights/1000'
 
         # infer_input_shape越大，精度会上升，但速度会下降。
         # self.infer_input_shape = (320, 320)
@@ -182,6 +185,8 @@ class YOLOv3_Config_1(object):
         # 推理时的分数阈值和nms_iou阈值
         self.infer_conf_thresh = 0.05
         self.infer_nms_thresh = 0.45
+        self.infer_keep_top_k = 100
+        self.infer_nms_top_k = 100
 
         # 是否给图片画框。
         self.infer_draw_image = True
