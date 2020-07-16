@@ -74,7 +74,7 @@ if __name__ == '__main__':
                 output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
             elif algorithm == 'YOLOv3':
                 backbone = Resnet50Vd()
-                head = YOLOv3Head()
+                head = YOLOv3Head(keep_prob=1.0)   # 一定要设置keep_prob=1.0, 为了得到一致的推理结果
                 yolov3 = YOLOv3(backbone, head)
                 output_l, output_m, output_s = yolov3(inputs)
             eval_fetch_list = [output_l, output_m, output_s]

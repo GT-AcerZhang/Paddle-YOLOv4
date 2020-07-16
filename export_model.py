@@ -134,7 +134,7 @@ if __name__ == '__main__':
     save_dir = 'inference_model'
 
     # 导出时用fastnms还是不后处理
-    # postprocess = 'fastnms'
+    postprocess = 'fastnms'
     postprocess = 'multiclass_nms'
     # postprocess = 'numpy_nms'
 
@@ -221,7 +221,7 @@ if __name__ == '__main__':
                 test_fetches = {'boxes': boxes, 'scores': scores, 'classes': classes, }
             elif algorithm == 'YOLOv3':
                 backbone = Resnet50Vd()
-                head = YOLOv3Head()
+                head = YOLOv3Head(keep_prob=1.0)   # 一定要设置keep_prob=1.0, 为了得到一致的推理结果
                 yolov3 = YOLOv3(backbone, head)
                 if postprocess == 'fastnms':
                     boxes, scores, classes = yolov3(inputs, export=True, postprocess=postprocess, param=param)

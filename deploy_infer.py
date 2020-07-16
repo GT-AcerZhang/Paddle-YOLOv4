@@ -563,11 +563,14 @@ class Detector():
             outs0 = outs0.copy_to_cpu()
         # 若没有物体，返回[[]]
         if np.shape(outs0)[1] == 1:
+            print(outs0)
             if isinstance(image, str):
                 print('[WARNNING] No object detected in %s.' % image)
             results = {'boxes': np.array([])}
         else:
+            origin_h, origin_w = im_info['origin_shape']
             boxes = outs0[:, 2:]
+            boxes *= [origin_w, origin_h, origin_w, origin_h]
             scores = outs0[:, 1]
             classes = outs0[:, 0].astype(np.int32)
             results = self.postprocess(boxes, scores, classes, im_info, threshold=threshold)

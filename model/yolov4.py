@@ -270,7 +270,7 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
         nms_thresh = param['nms_thresh']
         keep_top_k = param['keep_top_k']
         nms_top_k = param['nms_top_k']
-        use_yolo_box = param['use_yolo_box']
+        use_yolo_box = True
 
 
         # 先对坐标解码

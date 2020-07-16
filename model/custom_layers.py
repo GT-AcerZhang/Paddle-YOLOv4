@@ -83,11 +83,6 @@ class Conv2dUnit(object):
                 bias_attr=battr,
                 name=conv_name + '.conv2d.output.1')
         if self.bn:
-            bn_name = ''
-            # if 'conv' in conv_name:
-            #     bn_name = conv_name.replace('conv', 'bn')
-            # elif 'res' in conv_name:
-            #     bn_name = conv_name.replace('res', 'bn')
             if conv_name == "conv1":
                 bn_name = "bn_" + conv_name
             else:
