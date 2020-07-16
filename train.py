@@ -22,7 +22,10 @@ import threading
 import numpy as np
 import os
 
-from config import TrainConfig
+from config import *
+from model.head import YOLOv3Head
+from model.resnet import Resnet50Vd
+from model.yolov3 import YOLOv3
 from model.yolov4 import YOLOv4
 from tools.cocotools import get_classes, catid2clsid, clsid2catid
 from model.decode_np import Decode
@@ -285,7 +288,13 @@ def clear_model(save_dir):
 if __name__ == '__main__':
     use_gpu = False
     use_gpu = True
-    cfg = TrainConfig()
+
+    # 选择配置
+    # cfg = YOLOv4_Config_1()
+    cfg = YOLOv3_Config_1()
+
+
+    algorithm = cfg.algorithm
 
     class_names = get_classes(cfg.classes_path)
     num_classes = len(class_names)
@@ -304,7 +313,13 @@ if __name__ == '__main__':
         with fluid.unique_name.guard():
             # 多尺度训练
             inputs = P.data(name='input_1', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
-            output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
+            if algorithm == 'YOLOv4':
+                output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
+            elif algorithm == 'YOLOv3':
+                backbone = Resnet50Vd()
+                head = YOLOv3Head()
+                yolov3 = YOLOv3(backbone, head)
+                output_l, output_m, output_s = yolov3(inputs)
 
             # 建立损失函数
             label_sbbox = P.data(name='input_2', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False, dtype='float32')
@@ -324,7 +339,13 @@ if __name__ == '__main__':
         with fluid.unique_name.guard():
             # 多尺度训练
             inputs = P.data(name='input_1', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
-            output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
+            if algorithm == 'YOLOv4':
+                output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
+            elif algorithm == 'YOLOv3':
+                backbone = Resnet50Vd()
+                head = YOLOv3Head()
+                yolov3 = YOLOv3(backbone, head)
+                output_l, output_m, output_s = yolov3(inputs)
             eval_fetch_list = [output_l, output_m, output_s]
     eval_prog = eval_prog.clone(for_test=True)
 
@@ -335,7 +356,7 @@ if __name__ == '__main__':
     exe.run(startup_prog)
 
     compiled_eval_prog = fluid.compiler.CompiledProgram(eval_prog)
-    _decode = Decode(cfg.conf_thresh, cfg.nms_thresh, cfg.input_shape, exe, compiled_eval_prog, class_names)
+    _decode = Decode(algorithm, cfg.anchors, cfg.conf_thresh, cfg.nms_thresh, cfg.input_shape, exe, compiled_eval_prog, class_names)
 
     if cfg.pattern == 1:
         fluid.load(train_prog, cfg.model_path, executor=exe)
@@ -380,7 +401,7 @@ if __name__ == '__main__':
     bboxXYXY2XYWH = BboxXYXY2XYWH()             # sample['gt_bbox']被改写为cx_cy_w_h格式。
     # batch_transforms
     randomShape = RandomShape()                 # 多尺度训练。随机选一个尺度。也随机选一种插值方式。
-    normalizeImage = NormalizeImage(is_scale=True, is_channel_first=False)   # 图片归一化。直接除以255。
+    normalizeImage = NormalizeImage(algorithm, is_scale=True, is_channel_first=False)   # 图片归一化。直接除以255。
     gt2YoloTarget = Gt2YoloTarget(cfg.anchors,
                                   cfg.anchor_masks,
                                   cfg.downsample_ratios,

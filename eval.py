@@ -15,6 +15,10 @@ import copy
 import json
 import time
 import numpy as np
+from config import *
+from model.head import YOLOv3Head
+from model.resnet import Resnet50Vd
+from model.yolov3 import YOLOv3
 from tools.cocotools import eval
 import paddle.fluid as fluid
 import paddle.fluid.layers as P
@@ -35,36 +39,43 @@ use_gpu = True
 
 
 if __name__ == '__main__':
-    # classes_path = 'data/voc_classes.txt'
-    classes_path = 'data/coco_classes.txt'
-    # model_path可以是'yolov4'、'./weights/step00001000'这些。
-    # model_path = 'yolov4'
-    model_path = './weights/step00252000'
+    # 选择配置
+    # cfg = YOLOv4_Config_1()
+    cfg = YOLOv3_Config_1()
+
+
+    algorithm = cfg.algorithm
+    classes_path = cfg.classes_path
+
+    # 读取的模型
+    model_path = cfg.infer_model_path
 
     # input_shape越大，精度会上升，但速度会下降。
-    # input_shape = (320, 320)
-    # input_shape = (416, 416)
-    input_shape = (608, 608)
-    # 验证时的分数阈值和nms_iou阈值
-    conf_thresh = 0.001
-    nms_thresh = 0.45
-    # 是否画出验证集图片
-    draw_image = False
+    input_shape = cfg.input_shape
+
+    # 推理时的分数阈值和nms_iou阈值
+    conf_thresh = cfg.conf_thresh
+    nms_thresh = cfg.nms_thresh
+
+    # 是否给图片画框。
+    draw_image = cfg.draw_image
+
     # 验证时的批大小
-    eval_batch_size = 4
+    eval_batch_size = cfg.eval_batch_size
 
     # 验证集图片的相对路径
-    # eval_pre_path = '../VOCdevkit/VOC2012/JPEGImages/'
-    # anno_file = 'annotation_json/voc2012_val.json'
-    eval_pre_path = '../data/data7122/val2017/'
-    anno_file = '../data/data7122/annotations/instances_val2017.json'
+    # eval_pre_path = '../COCO/val2017/'
+    # anno_file = '../COCO/annotations/instances_val2017.json'
+    eval_pre_path = cfg.val_pre_path
+    anno_file = cfg.val_path
     with open(anno_file, 'r', encoding='utf-8') as f2:
         for line in f2:
             line = line.strip()
             dataset = json.loads(line)
             images = dataset['images']
 
-    num_anchors = 3
+    anchors = cfg.anchors
+    num_anchors = len(cfg.anchor_masks[0])
     all_classes = get_classes(classes_path)
     num_classes = len(all_classes)
 
@@ -75,7 +86,13 @@ if __name__ == '__main__':
         with fluid.unique_name.guard():
             # 多尺度训练
             inputs = P.data(name='input_1', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
-            output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
+            if algorithm == 'YOLOv4':
+                output_l, output_m, output_s = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True)
+            elif algorithm == 'YOLOv3':
+                backbone = Resnet50Vd()
+                head = YOLOv3Head()
+                yolov3 = YOLOv3(backbone, head)
+                output_l, output_m, output_s = yolov3(inputs)
             eval_fetch_list = [output_l, output_m, output_s]
     eval_prog = eval_prog.clone(for_test=True)
     gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
@@ -84,7 +101,7 @@ if __name__ == '__main__':
     exe.run(startup_prog)
 
     fluid.load(eval_prog, model_path, executor=exe)
-    _decode = Decode(conf_thresh, nms_thresh, input_shape, exe, eval_prog, all_classes)
+    _decode = Decode(algorithm, anchors, conf_thresh, nms_thresh, input_shape, exe, eval_prog, all_classes)
 
 
     _clsid2catid = copy.deepcopy(clsid2catid)

@@ -15,6 +15,8 @@ import time
 import numpy as np
 import paddle.fluid as fluid
 import paddle.fluid.layers as P
+
+from config import *
 from tools.cocotools import get_classes
 from model.resnet import Resnet50Vd
 from model.head import YOLOv3Head
@@ -35,35 +37,29 @@ use_gpu = True
 
 
 if __name__ == '__main__':
-    # 选算法
-    algorithm = 'YOLOv4'
-    # algorithm = 'YOLOv3'
+    # 选择配置
+    cfg = YOLOv4_Config_1()
+    cfg = YOLOv3_Config_1()
 
-    # classes_path = 'data/voc_classes.txt'
-    classes_path = 'data/coco_classes.txt'
-    # model_path可以是'yolov4'、'./weights/1000'这些。
 
-    if algorithm == 'YOLOv4':
-        model_path = 'yolov4'
-        model_path = './weights/66000'
-    elif algorithm == 'YOLOv3':
-        model_path = 'yolov3_r50vd_dcn_obj365_dropblock_iouloss'
+    algorithm = cfg.algorithm
+    classes_path = cfg.classes_path
+
+    # 读取的模型
+    model_path = cfg.infer_model_path
 
     # input_shape越大，精度会上升，但速度会下降。
-    # input_shape = (320, 320)
-    # input_shape = (416, 416)
-    input_shape = (608, 608)
+    input_shape = cfg.infer_input_shape
 
-    # 验证时的分数阈值和nms_iou阈值
-    conf_thresh = 0.05
-    nms_thresh = 0.45
+    # 推理时的分数阈值和nms_iou阈值
+    conf_thresh = cfg.infer_conf_thresh
+    nms_thresh = cfg.infer_nms_thresh
 
-    # 是否给图片画框。不画可以提速。读图片、后处理还可以继续优化。
-    draw_image = True
-    # draw_image = False
+    # 是否给图片画框。
+    draw_image = cfg.infer_draw_image
 
-
-    num_anchors = 3
+    anchors = cfg.anchors
+    num_anchors = len(cfg.anchor_masks[0])
     all_classes = get_classes(classes_path)
     num_classes = len(all_classes)
 
@@ -89,7 +85,7 @@ if __name__ == '__main__':
     exe.run(startup_prog)
 
     fluid.load(eval_prog, model_path, executor=exe)
-    _decode = Decode(conf_thresh, nms_thresh, input_shape, exe, eval_prog, all_classes)
+    _decode = Decode(algorithm, anchors, conf_thresh, nms_thresh, input_shape, exe, eval_prog, all_classes)
 
     if not os.path.exists('images/res/'): os.mkdir('images/res/')
 
@@ -99,7 +95,7 @@ if __name__ == '__main__':
     if use_gpu:
         for k, filename in enumerate(path_dir):
             image = cv2.imread('images/test/' + filename)
-            image, boxes, scores, classes = _decode.detect_image(image, eval_fetch_list, algorithm, draw_image=False)
+            image, boxes, scores, classes = _decode.detect_image(image, eval_fetch_list, draw_image=False)
             if k == 10:
                 break
 
@@ -111,7 +107,7 @@ if __name__ == '__main__':
     start = time.time()
     for k, filename in enumerate(path_dir):
         image = cv2.imread('images/test/' + filename)
-        image, boxes, scores, classes = _decode.detect_image(image, eval_fetch_list, algorithm, draw_image)
+        image, boxes, scores, classes = _decode.detect_image(image, eval_fetch_list, draw_image)
 
         # 估计剩余时间
         start_time = end_time

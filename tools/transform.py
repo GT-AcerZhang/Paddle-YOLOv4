@@ -608,8 +608,9 @@ class RandomShape(BaseOperator):
 
 class NormalizeImage(BaseOperator):
     def __init__(self,
-                 mean=[0., 0., 0.],
-                 std=[1, 1, 1],
+                 algorithm,
+                 mean=[0.485, 0.456, 0.406],
+                 std=[0.229, 0.224, 0.225],
                  is_scale=True,
                  is_channel_first=True):
         """
@@ -618,6 +619,7 @@ class NormalizeImage(BaseOperator):
             std (list): the pixel variance
         """
         super(NormalizeImage, self).__init__()
+        self.algorithm = algorithm
         self.mean = mean
         self.std = std
         self.is_scale = is_scale
@@ -646,16 +648,13 @@ class NormalizeImage(BaseOperator):
                 if k.startswith('image'):
                     im = sample[k]
                     im = im.astype(np.float32, copy=False)
-                    # if self.is_channel_first:
-                    #     mean = np.array(self.mean)[:, np.newaxis, np.newaxis]
-                    #     std = np.array(self.std)[:, np.newaxis, np.newaxis]
-                    # else:
-                    #     mean = np.array(self.mean)[np.newaxis, np.newaxis, :]
-                    #     std = np.array(self.std)[np.newaxis, np.newaxis, :]
-                    if self.is_scale:
+                    if self.algorithm == 'YOLOv4':
                         im = im / 255.0
-                    # im -= mean
-                    # im /= std
+                    elif self.algorithm == 'YOLOv3':
+                        mean = np.array(self.mean)[np.newaxis, np.newaxis, :].astype(np.float32)
+                        std = np.array(self.std)[np.newaxis, np.newaxis, :].astype(np.float32)
+                        im -= mean
+                        im /= std
                     sample[k] = im
         if not batch_input:
             samples = samples[0]
