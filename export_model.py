@@ -218,8 +218,6 @@ if __name__ == '__main__':
                 feed_vars = [('image', inputs), ]
                 feed_vars = OrderedDict(feed_vars)
 
-            boxes, scores, classes = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, postprocess=postprocess, param=param)
-
             if algorithm == 'YOLOv4':
                 boxes, scores, classes = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, postprocess=postprocess, param=param)
             elif algorithm == 'YOLOv3':
@@ -236,18 +234,15 @@ if __name__ == '__main__':
 
 
     logger.info("postprocess: %s" % postprocess)
-
-    logger.info("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq22222.")
     load_params(exe, infer_prog, model_path)
-    logger.info("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq3333333.")
 
     save_infer_model(save_dir, exe, feed_vars, test_fetches, infer_prog)
-    logger.info("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq333333ttttttttttttttt3.")
 
     # 导出配置文件
     cfg = {}
     input_shape_h = input_shape[0]
     input_shape_w = input_shape[1]
+    cfg['arch'] = algorithm
     cfg['min_subgraph_size'] = min_subgraph_size
     cfg['use_python_inference'] = use_python_inference
     cfg['mode'] = mode
@@ -256,7 +251,22 @@ if __name__ == '__main__':
     cfg['input_shape_h'] = input_shape_h
     cfg['input_shape_w'] = input_shape_w
     cfg['class_names'] = all_classes
-    logger.info("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq.")
+    if algorithm == 'YOLOv4':
+        cfg['is_scale'] = True
+        cfg['mean0'] = 0.0
+        cfg['mean1'] = 0.0
+        cfg['mean2'] = 0.0
+        cfg['std0'] = 1.0
+        cfg['std1'] = 1.0
+        cfg['std2'] = 1.0
+    elif algorithm == 'YOLOv3':
+        cfg['is_scale'] = False
+        cfg['mean0'] = 0.485
+        cfg['mean1'] = 0.456
+        cfg['mean2'] = 0.406
+        cfg['std0'] = 0.229
+        cfg['std1'] = 0.224
+        cfg['std2'] = 0.225
     dump_infer_config(save_dir, cfg)
     logger.info("Done.")
 

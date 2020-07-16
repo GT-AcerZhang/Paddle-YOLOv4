@@ -79,7 +79,7 @@ class YOLOv4_Config_1(object):
         self.downsample_ratios = [32, 16, 8]
 
 
-        # ============= 推理时相关 =============
+        # ============= 推理、导出时相关 =============
         # 读取的模型
         # self.infer_model_path = 'yolov4'
         self.infer_model_path = './weights/66000'
@@ -172,7 +172,7 @@ class YOLOv3_Config_1(object):
         self.downsample_ratios = [32, 16, 8]
 
 
-        # ============= 推理时相关 =============
+        # ============= 推理、导出时相关 =============
         # 读取的模型
         self.infer_model_path = 'yolov3_r50vd_dcn_obj365_dropblock_iouloss'
         # self.infer_model_path = './weights/1000'
@@ -194,6 +194,19 @@ class YOLOv3_Config_1(object):
 
 
 
+class PostprocessNumpyNMSConfig(object):
+    """
+    deploy_infer.py后处理配置
+    """
+    def __init__(self):
+        self.anchors = [[12, 16], [19, 36], [40, 28],
+                        [36, 75], [76, 55], [72, 146],
+                        [142, 110], [192, 243], [459, 401]]
+        self.conf_thresh = 0.05
+        self.nms_thresh = 0.45
+        self.keep_top_k = 100
+        self.nms_top_k = 100
+        self.nms_top_k = 100
 
 
 class TrainConfig_2(object):

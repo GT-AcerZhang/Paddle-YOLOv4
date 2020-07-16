@@ -1,4 +1,4 @@
-arch: YOLOv4
+arch: ${arch}
 min_subgraph_size: ${min_subgraph_size}
 use_python_inference: ${use_python_inference}
 mode: ${mode}
@@ -16,15 +16,15 @@ Preprocess:
   type: Resize
   use_cv2: true
 - is_channel_first: false
-  is_scale: true
+  is_scale: ${is_scale}
   mean:
-  - 0.
-  - 0.
-  - 0.
+  - ${mean0}
+  - ${mean1}
+  - ${mean2}
   std:
-  - 1.
-  - 1.
-  - 1.
+  - ${std0}
+  - ${std1}
+  - ${std2}
   type: Normalize
 - channel_first: true
   to_bgr: false

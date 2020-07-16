@@ -172,16 +172,16 @@ class Normalize(object):
             im_info (dict): info of processed image
         """
         im = im.astype(np.float32, copy=False)
-        # if self.is_channel_first:
-        #     mean = np.array(self.mean)[:, np.newaxis, np.newaxis]
-        #     std = np.array(self.std)[:, np.newaxis, np.newaxis]
-        # else:
-        #     mean = np.array(self.mean)[np.newaxis, np.newaxis, :]
-        #     std = np.array(self.std)[np.newaxis, np.newaxis, :]
+        if self.is_channel_first:
+            mean = np.array(self.mean)[:, np.newaxis, np.newaxis]
+            std = np.array(self.std)[:, np.newaxis, np.newaxis]
+        else:
+            mean = np.array(self.mean)[np.newaxis, np.newaxis, :]
+            std = np.array(self.std)[np.newaxis, np.newaxis, :]
         if self.is_scale:
             im = im / 255.0
-        # im -= mean
-        # im /= std
+        im -= mean
+        im /= std
         return im, im_info
 
 
