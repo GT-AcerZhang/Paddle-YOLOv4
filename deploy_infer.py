@@ -257,11 +257,9 @@ def create_inputs(im, im_info, model_arch='YOLO'):
     resize_shape = list(im_info['resize_shape'])
     scale = im_info['scale']
     if 'YOLO' in model_arch:
-        # 要先是w再h
+        # 先h再w
         origin_shape = np.array([origin_shape]).astype('int32')
         resize_shape = np.array([resize_shape]).astype('int32')
-        origin_shape = origin_shape[:, [1, 0]]
-        resize_shape = resize_shape[:, [1, 0]]
         inputs['origin_shape'] = origin_shape
         inputs['resize_shape'] = resize_shape
     elif 'RetinaNet' in model_arch:
@@ -530,7 +528,6 @@ class Detector():
                             shape:[N, class_num, mask_resolution, mask_resolution]
         '''
         inputs, im_info = self.preprocess(image)
-        np_boxes, np_masks = None, None
 
         # 如果用python预测。
         if self.config.use_python_inference:
@@ -568,9 +565,7 @@ class Detector():
                 print('[WARNNING] No object detected in %s.' % image)
             results = {'boxes': np.array([])}
         else:
-            origin_h, origin_w = im_info['origin_shape']
             boxes = outs0[:, 2:]
-            boxes *= [origin_w, origin_h, origin_w, origin_h]
             scores = outs0[:, 1]
             classes = outs0[:, 0].astype(np.int32)
             results = self.postprocess(boxes, scores, classes, im_info, threshold=threshold)

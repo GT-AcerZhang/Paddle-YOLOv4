@@ -26,8 +26,7 @@ class YOLOv3(object):
         body_feats = self.backbone(x)
         output_l, output_m, output_s = self.head(body_feats)
         if export:
-            # 用张量操作实现后处理
-            if postprocess == 'fastnms' or postprocess == 'multiclass_nms':
+            if postprocess == 'fastnms':
                 resize_shape = param['resize_shape']
                 origin_shape = param['origin_shape']
                 anchors = param['anchors']
@@ -38,7 +37,7 @@ class YOLOv3(object):
                 num_classes = param['num_classes']
                 num_anchors = param['num_anchors']
 
-                use_yolo_box = False
+                use_yolo_box = True
 
                 # 先对坐标解码
                 # 第一种方式。慢一点，但支持修改。
@@ -77,7 +76,7 @@ class YOLOv3(object):
                     # [bz, ?1, 4]  [bz, ?1, 80]   注意，是过滤置信度位小于conf_thresh的，而不是过滤最终分数！
                     bbox_l, prob_l = fluid.layers.yolo_box(
                         x=output_l,
-                        img_size=fluid.layers.ones(shape=[1, 2], dtype="int32"),   # 返回归一化的坐标，而且是x0y0x1y1格式
+                        img_size=origin_shape,
                         anchors=anchors[2],
                         class_num=num_classes,
                         conf_thresh=conf_thresh,
@@ -85,7 +84,7 @@ class YOLOv3(object):
                         clip_bbox=False)
                     bbox_m, prob_m = fluid.layers.yolo_box(
                         x=output_m,
-                        img_size=fluid.layers.ones(shape=[1, 2], dtype="int32"),   # 返回归一化的坐标，而且是x0y0x1y1格式
+                        img_size=origin_shape,
                         anchors=anchors[1],
                         class_num=num_classes,
                         conf_thresh=conf_thresh,
@@ -93,7 +92,7 @@ class YOLOv3(object):
                         clip_bbox=False)
                     bbox_s, prob_s = fluid.layers.yolo_box(
                         x=output_s,
-                        img_size=fluid.layers.ones(shape=[1, 2], dtype="int32"),   # 返回归一化的坐标，而且是x0y0x1y1格式
+                        img_size=origin_shape,
                         anchors=anchors[0],
                         class_num=num_classes,
                         conf_thresh=conf_thresh,
@@ -130,6 +129,62 @@ class YOLOv3(object):
                                                        nms_threshold=nms_thresh,
                                                        background_label=-1)   # 对于YOLO算法，一定要设置background_label=-1，否则检测不出人。
                     return pred
+            elif 'multiclass_nms':
+                origin_shape = param['origin_shape']
+                anchors = param['anchors']
+                conf_thresh = param['conf_thresh']
+                nms_thresh = param['nms_thresh']
+                keep_top_k = param['keep_top_k']
+                nms_top_k = param['nms_top_k']
+                num_classes = param['num_classes']
+                num_anchors = param['num_anchors']
+
+                anchors = anchors.astype(np.int32)
+                anchors = np.reshape(anchors, (-1, num_anchors*2))
+                anchors = anchors.tolist()
+                # [bz, ?1, 4]  [bz, ?1, 80]   注意，是过滤置信度位小于conf_thresh的，而不是过滤最终分数！
+                bbox_l, prob_l = fluid.layers.yolo_box(
+                    x=output_l,
+                    img_size=origin_shape,
+                    anchors=anchors[2],
+                    class_num=num_classes,
+                    conf_thresh=conf_thresh,
+                    downsample_ratio=32,
+                    clip_bbox=False)
+                bbox_m, prob_m = fluid.layers.yolo_box(
+                    x=output_m,
+                    img_size=origin_shape,
+                    anchors=anchors[1],
+                    class_num=num_classes,
+                    conf_thresh=conf_thresh,
+                    downsample_ratio=16,
+                    clip_bbox=False)
+                bbox_s, prob_s = fluid.layers.yolo_box(
+                    x=output_s,
+                    img_size=origin_shape,
+                    anchors=anchors[0],
+                    class_num=num_classes,
+                    conf_thresh=conf_thresh,
+                    downsample_ratio=8,
+                    clip_bbox=False)
+                boxes = []
+                scores = []
+                boxes.append(bbox_l)
+                boxes.append(bbox_m)
+                boxes.append(bbox_s)
+                scores.append(prob_l)
+                scores.append(prob_m)
+                scores.append(prob_s)
+                all_pred_boxes = fluid.layers.concat(boxes, axis=1)  # [batch_size, -1, 4]
+                all_pred_scores = fluid.layers.concat(scores, axis=1)  # [batch_size, -1, 80]
+                all_pred_scores = fluid.layers.transpose(all_pred_scores, perm=[0, 2, 1])
+                pred = fluid.layers.multiclass_nms(all_pred_boxes, all_pred_scores,
+                                                   score_threshold=conf_thresh,
+                                                   nms_top_k=nms_top_k,
+                                                   keep_top_k=keep_top_k,
+                                                   nms_threshold=nms_thresh,
+                                                   background_label=-1)   # 对于YOLO算法，一定要设置background_label=-1，否则检测不出人。
+                return pred
 
         # 相当于numpy的transpose()，交换下标
         output_l = fluid.layers.transpose(output_l, perm=[0, 2, 3, 1], name='output_l')
