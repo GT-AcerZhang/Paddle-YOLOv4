@@ -701,6 +701,10 @@ def play_video():
     if not os.path.exists(FLAGS.output_dir): os.makedirs(FLAGS.output_dir)
 
 
+    postprocess = config.postprocess
+    if postprocess == 'numpy_nms':
+        pcfg = PostprocessNumpyNMSConfig()
+
     # 获取颜色
     num_classes = len(detector.config.labels)
     colors = get_colors(num_classes)
@@ -712,7 +716,12 @@ def play_video():
     if FLAGS.use_gpu:
         for k, filename in enumerate(path_dir):
             img_path = image_dir + filename
-            results = detector.predict(img_path, detector.config.draw_threshold)
+            if postprocess == 'fastnms':
+                results = detector.predict_with_fastnms(img_path, detector.config.draw_threshold)
+            elif postprocess == 'numpy_nms':
+                results = detector.predict_with_numpy_nms(img_path, detector.config.draw_threshold, pcfg)
+            elif postprocess == 'multiclass_nms':
+                results = detector.predict_with_multiclass_nms(img_path, detector.config.draw_threshold)
             if k == 10:
                 break
 
@@ -735,7 +744,12 @@ def play_video():
             break
         print('detect frame:%d' % (index))
         index += 1
-        results = detector.predict(frame, detector.config.draw_threshold)
+        if postprocess == 'fastnms':
+            results = detector.predict_with_fastnms(frame, detector.config.draw_threshold)
+        elif postprocess == 'numpy_nms':
+            results = detector.predict_with_numpy_nms(frame, detector.config.draw_threshold, pcfg)
+        elif postprocess == 'multiclass_nms':
+            results = detector.predict_with_multiclass_nms(frame, detector.config.draw_threshold)
         im = visualize_box_mask(
             frame,
             results,
@@ -755,6 +769,11 @@ def predict_video():
     config = Config(FLAGS.model_dir)
     detector = Detector(
         FLAGS.model_dir, config, use_gpu=FLAGS.use_gpu, run_mode=config.mode)
+
+    postprocess = config.postprocess
+    if postprocess == 'numpy_nms':
+        pcfg = PostprocessNumpyNMSConfig()
+
     capture = cv2.VideoCapture(FLAGS.video_file)
     fps = 30
     width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -772,7 +791,12 @@ def predict_video():
             break
         print('detect frame:%d' % (index))
         index += 1
-        results = detector.predict(frame, detector.config.draw_threshold)
+        if postprocess == 'fastnms':
+            results = detector.predict_with_fastnms(frame, detector.config.draw_threshold)
+        elif postprocess == 'numpy_nms':
+            results = detector.predict_with_numpy_nms(frame, detector.config.draw_threshold, pcfg)
+        elif postprocess == 'multiclass_nms':
+            results = detector.predict_with_multiclass_nms(frame, detector.config.draw_threshold)
         im = visualize_box_mask(
             frame,
             results,

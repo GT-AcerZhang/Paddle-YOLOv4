@@ -134,7 +134,7 @@ if __name__ == '__main__':
     save_dir = 'inference_model'
 
     # 导出时用fastnms还是不后处理
-    postprocess = 'fastnms'
+    # postprocess = 'fastnms'
     postprocess = 'multiclass_nms'
     # postprocess = 'numpy_nms'
 
@@ -154,7 +154,7 @@ if __name__ == '__main__':
 
     # 选择配置
     cfg = YOLOv4_Config_1()
-    cfg = YOLOv3_Config_1()
+    # cfg = YOLOv3_Config_1()
 
 
     # =============== 以下不用设置 ===============
@@ -217,8 +217,12 @@ if __name__ == '__main__':
                 feed_vars = OrderedDict(feed_vars)
 
             if algorithm == 'YOLOv4':
-                boxes, scores, classes = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, postprocess=postprocess, param=param)
-                test_fetches = {'boxes': boxes, 'scores': scores, 'classes': classes, }
+                if postprocess == 'fastnms':
+                    boxes, scores, classes = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, export=True, postprocess=postprocess, param=param)
+                    test_fetches = {'boxes': boxes, 'scores': scores, 'classes': classes, }
+                if postprocess == 'multiclass_nms':
+                    pred = YOLOv4(inputs, num_classes, num_anchors, is_test=False, trainable=True, export=True, postprocess=postprocess, param=param)
+                    test_fetches = {'pred': pred, }
             elif algorithm == 'YOLOv3':
                 backbone = Resnet50Vd()
                 head = YOLOv3Head(keep_prob=1.0)   # 一定要设置keep_prob=1.0, 为了得到一致的推理结果

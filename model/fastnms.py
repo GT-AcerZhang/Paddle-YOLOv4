@@ -155,14 +155,12 @@ def fastnms(all_pred_boxes, all_pred_scores, resize_shape,
                       boxes[:, :2] + boxes[:, 2:] * 0.5], axis=-1)
 
     # 缩放到原图大小
-    resize_shape_f = P.cast(resize_shape, 'float32')
-    origin_shape_f = P.cast(origin_shape, 'float32')
-    if use_yolo_box:
-        scale = origin_shape_f
-    else:
+    if not use_yolo_box:
+        resize_shape_f = P.cast(resize_shape, 'float32')
+        origin_shape_f = P.cast(origin_shape, 'float32')
         scale = origin_shape_f / resize_shape_f
-    scale = P.expand(scale, [1, 2])
-    boxes *= scale   # 批大小是1才支持这么做，因为scale第0维表示批大小，boxes第0维却表示这张图片预测出的物体数
+        scale = P.expand(scale, [1, 3])   # [[h, w, h, w, h, w]]
+        boxes *= scale[:, 1:5]   # 批大小是1才支持这么做，因为scale第0维表示批大小，boxes第0维却表示这张图片预测出的物体数
 
     # 批大小在前
     boxes = P.reshape(boxes, (1, -1, 4), name='boxes')

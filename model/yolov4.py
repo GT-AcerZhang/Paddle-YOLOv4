@@ -140,9 +140,147 @@ def decode(conv_output, anchors, stride, num_class, conf_thresh):
     return pred_xywh, pred_conf, pred_prob
 
 
+def yolo_decode(output_l, output_m, output_s, postprocess=None, param=None):
+    if postprocess == 'fastnms':
+        resize_shape = param['resize_shape']
+        origin_shape = param['origin_shape']
+        anchors = param['anchors']
+        conf_thresh = param['conf_thresh']
+        nms_thresh = param['nms_thresh']
+        keep_top_k = param['keep_top_k']
+        nms_top_k = param['nms_top_k']
+        num_classes = param['num_classes']
+        num_anchors = param['num_anchors']
+
+        use_yolo_box = False
+        use_yolo_box = True
+
+        # 先对坐标解码
+        # 第一种方式。慢一点，但支持修改。
+        if not use_yolo_box:
+            # 相当于numpy的transpose()，交换下标
+            output_l = fluid.layers.transpose(output_l, perm=[0, 2, 3, 1], name='output_l')
+            output_m = fluid.layers.transpose(output_m, perm=[0, 2, 3, 1], name='output_m')
+            output_s = fluid.layers.transpose(output_s, perm=[0, 2, 3, 1], name='output_s')
+            pred_xywh_s, pred_conf_s, pred_prob_s = decode(output_s, anchors[0], 8, num_classes, conf_thresh)
+            pred_xywh_m, pred_conf_m, pred_prob_m = decode(output_m, anchors[1], 16, num_classes, conf_thresh)
+            pred_xywh_l, pred_conf_l, pred_prob_l = decode(output_l, anchors[2], 32, num_classes, conf_thresh)
+            # 获取分数。可以不用将pred_conf_s第2维重复80次，paddle支持直接相乘。
+            pred_score_s = pred_conf_s * pred_prob_s
+            pred_score_m = pred_conf_m * pred_prob_m
+            pred_score_l = pred_conf_l * pred_prob_l
+            # 所有输出层的预测框集合后再执行nms
+            all_pred_boxes = P.concat([pred_xywh_s, pred_xywh_m, pred_xywh_l], axis=1)  # [batch_size, -1, 4]
+            all_pred_scores = P.concat([pred_score_s, pred_score_m, pred_score_l], axis=1)  # [batch_size, -1, 80]
+
+        # 第二种方式。用官方yolo_box()函数快一点
+        if use_yolo_box:
+            anchors = anchors.astype(np.int32)
+            anchors = np.reshape(anchors, (-1, num_anchors * 2))
+            anchors = anchors.tolist()
+            # [bz, ?1, 4]  [bz, ?1, 80]   注意，是过滤置信度位小于conf_thresh的，而不是过滤最终分数！
+            bbox_l, prob_l = fluid.layers.yolo_box(
+                x=output_l,
+                img_size=origin_shape,
+                anchors=anchors[2],
+                class_num=num_classes,
+                conf_thresh=conf_thresh,
+                downsample_ratio=32,
+                clip_bbox=False)
+            bbox_m, prob_m = fluid.layers.yolo_box(
+                x=output_m,
+                img_size=origin_shape,
+                anchors=anchors[1],
+                class_num=num_classes,
+                conf_thresh=conf_thresh,
+                downsample_ratio=16,
+                clip_bbox=False)
+            bbox_s, prob_s = fluid.layers.yolo_box(
+                x=output_s,
+                img_size=origin_shape,
+                anchors=anchors[0],
+                class_num=num_classes,
+                conf_thresh=conf_thresh,
+                downsample_ratio=8,
+                clip_bbox=False)
+            boxes = []
+            scores = []
+            boxes.append(bbox_l)
+            boxes.append(bbox_m)
+            boxes.append(bbox_s)
+            scores.append(prob_l)
+            scores.append(prob_m)
+            scores.append(prob_s)
+            all_pred_boxes = fluid.layers.concat(boxes, axis=1)  # [batch_size, -1, 4]
+            all_pred_scores = fluid.layers.concat(scores, axis=1)  # [batch_size, -1, 80]
+            # 把x0y0x1y1格式转换成cx_cy_w_h格式
+            all_pred_boxes = P.concat([(all_pred_boxes[:, :, :2] + all_pred_boxes[:, :, 2:]) * 0.5,
+                                       all_pred_boxes[:, :, 2:] - all_pred_boxes[:, :, :2]], axis=-1)
+        # 官方的multiclass_nms()也更快一点。但是为了之后的深度定制。
+        # 用fastnms
+        boxes, scores, classes = fastnms(all_pred_boxes, all_pred_scores, resize_shape, origin_shape, conf_thresh,
+                                         nms_thresh, keep_top_k, nms_top_k, use_yolo_box)
+        return boxes, scores, classes
+    elif 'multiclass_nms':
+        origin_shape = param['origin_shape']
+        anchors = param['anchors']
+        conf_thresh = param['conf_thresh']
+        nms_thresh = param['nms_thresh']
+        keep_top_k = param['keep_top_k']
+        nms_top_k = param['nms_top_k']
+        num_classes = param['num_classes']
+        num_anchors = param['num_anchors']
+
+        anchors = anchors.astype(np.int32)
+        anchors = np.reshape(anchors, (-1, num_anchors * 2))
+        anchors = anchors.tolist()
+        # [bz, ?1, 4]  [bz, ?1, 80]   注意，是过滤置信度位小于conf_thresh的，而不是过滤最终分数！
+        bbox_l, prob_l = fluid.layers.yolo_box(
+            x=output_l,
+            img_size=origin_shape,
+            anchors=anchors[2],
+            class_num=num_classes,
+            conf_thresh=conf_thresh,
+            downsample_ratio=32,
+            clip_bbox=False)
+        bbox_m, prob_m = fluid.layers.yolo_box(
+            x=output_m,
+            img_size=origin_shape,
+            anchors=anchors[1],
+            class_num=num_classes,
+            conf_thresh=conf_thresh,
+            downsample_ratio=16,
+            clip_bbox=False)
+        bbox_s, prob_s = fluid.layers.yolo_box(
+            x=output_s,
+            img_size=origin_shape,
+            anchors=anchors[0],
+            class_num=num_classes,
+            conf_thresh=conf_thresh,
+            downsample_ratio=8,
+            clip_bbox=False)
+        boxes = []
+        scores = []
+        boxes.append(bbox_l)
+        boxes.append(bbox_m)
+        boxes.append(bbox_s)
+        scores.append(prob_l)
+        scores.append(prob_m)
+        scores.append(prob_s)
+        all_pred_boxes = fluid.layers.concat(boxes, axis=1)  # [batch_size, -1, 4]
+        all_pred_scores = fluid.layers.concat(scores, axis=1)  # [batch_size, -1, 80]
+        all_pred_scores = fluid.layers.transpose(all_pred_scores, perm=[0, 2, 1])
+        pred = fluid.layers.multiclass_nms(all_pred_boxes, all_pred_scores,
+                                           score_threshold=conf_thresh,
+                                           nms_top_k=nms_top_k,
+                                           keep_top_k=keep_top_k,
+                                           nms_threshold=nms_thresh,
+                                           background_label=-1)  # 对于YOLO算法，一定要设置background_label=-1，否则检测不出人。
+        return pred
+
+
 def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, trainable=True,
-           postprocess='numpy_nms', param=None):
-    assert postprocess in ['numpy_nms', 'fastnms'], "postprocess valid."
+           export=False, postprocess=None, param=None):
     i32 = initial_filters
     i64 = i32 * 2
     i128 = i32 * 4
@@ -261,87 +399,8 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
     output_l = conv2d_unit(output_l, num_anchors * (num_classes + 5), 1, stride=1, bn=0, act=None, name='conv110',
                            is_test=is_test, trainable=trainable)
 
-    # 用张量操作实现后处理
-    if postprocess == 'fastnms':
-        resize_shape = param['resize_shape']
-        origin_shape = param['origin_shape']
-        anchors = param['anchors']
-        conf_thresh = param['conf_thresh']
-        nms_thresh = param['nms_thresh']
-        keep_top_k = param['keep_top_k']
-        nms_top_k = param['nms_top_k']
-        use_yolo_box = True
-
-
-        # 先对坐标解码
-        # 第一种方式。慢一点，但支持修改。
-        if not use_yolo_box:
-            # 相当于numpy的transpose()，交换下标
-            output_l = fluid.layers.transpose(output_l, perm=[0, 2, 3, 1], name='output_l')
-            output_m = fluid.layers.transpose(output_m, perm=[0, 2, 3, 1], name='output_m')
-            output_s = fluid.layers.transpose(output_s, perm=[0, 2, 3, 1], name='output_s')
-            pred_xywh_s, pred_conf_s, pred_prob_s = decode(output_s, anchors[0], 8, num_classes, conf_thresh)
-            pred_xywh_m, pred_conf_m, pred_prob_m = decode(output_m, anchors[1], 16, num_classes, conf_thresh)
-            pred_xywh_l, pred_conf_l, pred_prob_l = decode(output_l, anchors[2], 32, num_classes, conf_thresh)
-            # 获取分数。可以不用将pred_conf_s第2维重复80次，paddle支持直接相乘。
-            pred_score_s = pred_conf_s * pred_prob_s
-            pred_score_m = pred_conf_m * pred_prob_m
-            pred_score_l = pred_conf_l * pred_prob_l
-            # 所有输出层的预测框集合后再执行nms
-            all_pred_boxes = P.concat([pred_xywh_s, pred_xywh_m, pred_xywh_l], axis=1)       # [batch_size, -1, 4]
-            all_pred_scores = P.concat([pred_score_s, pred_score_m, pred_score_l], axis=1)   # [batch_size, -1, 80]
-
-
-        # 第二种方式。用官方yolo_box()函数快一点
-        if use_yolo_box:
-            anchors = anchors.astype(np.int32)
-            anchors = np.reshape(anchors, (-1, num_anchors*2))
-            anchors = anchors.tolist()
-            # [bz, ?1, 4]  [bz, ?1, 80]   注意，是过滤置信度位小于conf_thresh的，而不是过滤最终分数！
-            bbox_l, prob_l = fluid.layers.yolo_box(
-                x=output_l,
-                img_size=fluid.layers.ones(shape=[1, 2], dtype="int32"),   # 返回归一化的坐标，而且是x0y0x1y1格式
-                anchors=anchors[2],
-                class_num=num_classes,
-                conf_thresh=conf_thresh,
-                downsample_ratio=32,
-                clip_bbox=False)
-            bbox_m, prob_m = fluid.layers.yolo_box(
-                x=output_m,
-                img_size=fluid.layers.ones(shape=[1, 2], dtype="int32"),   # 返回归一化的坐标，而且是x0y0x1y1格式
-                anchors=anchors[1],
-                class_num=num_classes,
-                conf_thresh=conf_thresh,
-                downsample_ratio=16,
-                clip_bbox=False)
-            bbox_s, prob_s = fluid.layers.yolo_box(
-                x=output_s,
-                img_size=fluid.layers.ones(shape=[1, 2], dtype="int32"),   # 返回归一化的坐标，而且是x0y0x1y1格式
-                anchors=anchors[0],
-                class_num=num_classes,
-                conf_thresh=conf_thresh,
-                downsample_ratio=8,
-                clip_bbox=False)
-            boxes = []
-            scores = []
-            boxes.append(bbox_l)
-            boxes.append(bbox_m)
-            boxes.append(bbox_s)
-            scores.append(prob_l)
-            scores.append(prob_m)
-            scores.append(prob_s)
-            all_pred_boxes = fluid.layers.concat(boxes, axis=1)  # [batch_size, -1, 4]
-            # 把x0y0x1y1格式转换成cx_cy_w_h格式
-            all_pred_boxes = P.concat([(all_pred_boxes[:, :, :2] + all_pred_boxes[:, :, 2:]) * 0.5,
-                                       all_pred_boxes[:, :, 2:] - all_pred_boxes[:, :, :2]], axis=-1)
-            all_pred_scores = fluid.layers.concat(scores, axis=1)  # [batch_size, -1, 80]
-            # 官方的multiclass_nms()也更快一点。但是为了之后的深度定制。
-
-
-        # 用fastnms
-        boxes, scores, classes = fastnms(all_pred_boxes, all_pred_scores, resize_shape, origin_shape, conf_thresh,
-                                         nms_thresh, keep_top_k, nms_top_k, use_yolo_box)
-        return boxes, scores, classes
+    if export:
+        return yolo_decode(output_l, output_m, output_s, postprocess, param)
 
     # 相当于numpy的transpose()，交换下标
     output_l = fluid.layers.transpose(output_l, perm=[0, 2, 3, 1], name='output_l')
