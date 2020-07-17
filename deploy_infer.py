@@ -441,7 +441,7 @@ class Detector():
         # postprocess output of predictor
         results = {}
         # 再做一次分数过滤
-        if threshold > 0.:
+        if threshold > 0.0:
             expect_boxes = scores > threshold
             boxes = boxes[expect_boxes, :]
             scores = scores[expect_boxes]

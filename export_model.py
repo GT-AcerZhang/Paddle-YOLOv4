@@ -147,10 +147,10 @@ if __name__ == '__main__':
     # 使用GPU时，默认为fluid, 可选（fluid/trt_fp32/trt_fp16）
     mode = 'fluid'
 
-    # 对模型输出的预测框再进行一次分数过滤的阈值。设置为负数表示不再进行分数过滤。
+    # 对模型输出的预测框再进行一次分数过滤的阈值。设置为0.0表示不再进行分数过滤。
     # 与conf_thresh不同，需要修改这个值的话直接编辑导出的inference_model/infer_cfg.yml配置文件，不需要重新导出模型。
     # 总之，inference_model/infer_cfg.yml里的配置可以手动修改，不需要重新导出模型。
-    draw_threshold = -1.0
+    draw_threshold = 0.0
 
     # 选择配置
     cfg = YOLOv4_Config_1()
