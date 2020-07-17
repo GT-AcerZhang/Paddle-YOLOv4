@@ -48,7 +48,7 @@ class BaseOperator(object):
 
 
 class DecodeImage(BaseOperator):
-    def __init__(self, to_rgb=True, with_mixup=False):
+    def __init__(self, to_rgb=True, with_mixup=False, process_mask=False):
         """ Transform the image data to numpy format.
         对图片解码。最开始的一步。把图片读出来（rgb格式），加入到sample['image']。一维数组[h, w, 1]加入到sample['im_info']
         Args:
@@ -59,10 +59,27 @@ class DecodeImage(BaseOperator):
         super(DecodeImage, self).__init__()
         self.to_rgb = to_rgb
         self.with_mixup = with_mixup
+        self.process_mask = process_mask
         if not isinstance(self.to_rgb, bool):
             raise TypeError("{}: input type is invalid.".format(self))
         if not isinstance(self.with_mixup, bool):
             raise TypeError("{}: input type is invalid.".format(self))
+
+    def _poly2mask(self, mask_ann, img_h, img_w):
+        import pycocotools.mask as maskUtils
+        if isinstance(mask_ann, list):
+            # polygon -- a single object might consist of multiple parts
+            # we merge all parts into one mask rle code
+            rles = maskUtils.frPyObjects(mask_ann, img_h, img_w)
+            rle = maskUtils.merge(rles)
+        elif isinstance(mask_ann['counts'], list):
+            # uncompressed RLE
+            rle = maskUtils.frPyObjects(mask_ann, img_h, img_w)
+        else:
+            # rle
+            rle = mask_ann
+        mask = maskUtils.decode(rle)
+        return mask[:, :, np.newaxis]
 
     def __call__(self, sample, context=None, coco=None):
         """ load image if 'im_file' field is not empty but 'image' is"""
@@ -88,36 +105,32 @@ class DecodeImage(BaseOperator):
         if self.with_mixup and 'mixup' in sample:
             self.__call__(sample['mixup'], context, coco)
 
-        # 掩码图片。如果是训练集的话。
-        '''if 'gt_poly' in sample:
-            gt_poly = sample['gt_poly']
-            assert len(gt_poly) == len(sample['gt_bbox']), "Poly Numbers Error."
-            gt_mask = []
-            if len(gt_poly) > 0:
-                # 最初的方案，用cv2.fillPoly()画出真实掩码。因为有取整，发现有点偏差。
-                # for obj_polys in gt_poly:
-                #     mask = np.zeros((im.shape[0], im.shape[1]), dtype="uint8")
-                #     for poly in obj_polys:  # coco数据集里，一个物体由多个多边形表示时（比如物体被挡住，不连通时）
-                #         points = np.array(poly)
-                #         points = np.reshape(points, (-1, 2))
-                #         points = points.astype(np.int32)
-                #         vertices = np.array([points], dtype=np.int32)
-                #         cv2.fillPoly(mask, vertices, 1)   # 一定要是这个API而不是fillConvexPoly()，后者只能填充凸多边形而不支持凹多边形。
-                #         mask = np.reshape(mask, (im.shape[0], im.shape[1], 1))
-                #     gt_mask.append(mask)
-                # gt_mask = np.concatenate(gt_mask, axis=-1)
+        # 掩码
+        if self.process_mask:
+            if 'gt_poly' in sample:
+                gt_poly = sample['gt_poly']
+            else:
+                gt_poly = []
+            img_h = im.shape[0]
+            img_w = im.shape[1]
+            gt_mask = [self._poly2mask(mask, img_h, img_w) for mask in gt_poly]
+            if len(gt_mask) == 0:
+                # 对于没有gt的纯背景图，弄1个方便后面的增强跟随sample['image']
+                gt_mask = np.zeros((img_h, img_w, 1), dtype=np.int32)
+            else:
+                gt_mask = np.concatenate(gt_mask, axis=-1)
+            sample['gt_mask'] = gt_mask
 
-                # 现在的方案，用annToMask()得到真实掩码
-                anno_id = sample['anno_id']
-                target = coco.loadAnns(anno_id)
-                # mask是一个list，里面每一个元素是一个shape=(height*width,)的ndarray，1代表是这个注解注明的物体，0代表其他物体和背景。
-                masks = [coco.annToMask(obj).reshape(-1) for obj in target]
-                masks = np.vstack(masks)  # 设N=len(mask)=注解数，这一步将mask转换成一个ndarray，shape=(N, height*width)
-                masks = masks.reshape(-1, im.shape[0], im.shape[1])  # shape=(N, height, width)
-                gt_mask = masks.transpose(1, 2, 0)     # shape=(height, width, N)
-            else:   # 对于没有gt的纯背景图，弄1个方便后面的增强跟随sample['image']
-                gt_mask = np.zeros((im.shape[0], im.shape[1], 1), dtype=np.int32)
-            sample['gt_mask'] = gt_mask'''
+            # 看掩码图片
+            # im_name = np.random.randint(0, 1000000)
+            # n = gt_mask.shape[2]
+            # cv2.imwrite('%d.jpg'%im_name, cv2.cvtColor(im, cv2.COLOR_RGB2BGR))
+            # for i in range(n):
+            #     mm = gt_mask[:, :, i]
+            #     un = np.unique(mm)
+            #     print(un)
+            #     cv2.imwrite('%d_%.2d.jpg'%(im_name, i), mm*255)
+
         return sample
 
 
@@ -269,7 +282,8 @@ class RandomCrop(BaseOperator):
                  scaling=[.3, 1.],
                  num_attempts=50,
                  allow_no_crop=True,
-                 cover_all_box=False):
+                 cover_all_box=False,
+                 process_mask=False):
         super(RandomCrop, self).__init__()
         self.aspect_ratio = aspect_ratio
         self.thresholds = thresholds
@@ -277,6 +291,7 @@ class RandomCrop(BaseOperator):
         self.num_attempts = num_attempts
         self.allow_no_crop = allow_no_crop
         self.cover_all_box = cover_all_box
+        self.process_mask = process_mask
 
     def __call__(self, sample, context=None):
         if 'gt_bbox' in sample and len(sample['gt_bbox']) == 0:
@@ -332,8 +347,9 @@ class RandomCrop(BaseOperator):
 
             if found:
                 sample['image'] = self._crop_image(sample['image'], crop_box)
-                # gt_mask = self._crop_image(sample['gt_mask'], crop_box)    # 掩码裁剪
-                # sample['gt_mask'] = np.take(gt_mask, valid_ids, axis=-1)   # 掩码筛选
+                if self.process_mask:
+                    gt_mask = self._crop_image(sample['gt_mask'], crop_box)    # 掩码裁剪
+                    sample['gt_mask'] = np.take(gt_mask, valid_ids, axis=-1)   # 掩码筛选
                 sample['gt_bbox'] = np.take(cropped_box, valid_ids, axis=0)
                 sample['gt_class'] = np.take(
                     sample['gt_class'], valid_ids, axis=0)
@@ -377,7 +393,7 @@ class RandomCrop(BaseOperator):
         return img[y1:y2, x1:x2, :]
 
 class RandomFlipImage(BaseOperator):
-    def __init__(self, prob=0.5, is_normalized=False, is_mask_flip=False):
+    def __init__(self, prob=0.5, is_normalized=False, is_mask_flip=False, process_mask=False):
         """
         Args:
             prob (float): the probability of flipping image
@@ -388,6 +404,7 @@ class RandomFlipImage(BaseOperator):
         self.prob = prob
         self.is_normalized = is_normalized
         self.is_mask_flip = is_mask_flip
+        self.process_mask = process_mask
         if not (isinstance(self.prob, float) and
                 isinstance(self.is_normalized, bool) and
                 isinstance(self.is_mask_flip, bool)):
@@ -444,7 +461,8 @@ class RandomFlipImage(BaseOperator):
         for sample in samples:
             gt_bbox = sample['gt_bbox']
             im = sample['image']
-            # gt_mask = sample['gt_mask']
+            if self.process_mask:
+                gt_mask = sample['gt_mask']
             if not isinstance(im, np.ndarray):
                 raise TypeError("{}: image is not a numpy array.".format(self))
             if len(im.shape) != 3:
@@ -452,7 +470,9 @@ class RandomFlipImage(BaseOperator):
             height, width, _ = im.shape
             if np.random.uniform(0, 1) < self.prob:
                 im = im[:, ::-1, :]
-                # gt_mask = gt_mask[:, ::-1, :]
+                if self.process_mask:
+                    gt_mask = gt_mask[:, ::-1, :]
+                    sample['gt_mask'] = gt_mask
                 if gt_bbox.shape[0] == 0:
                     return sample
                 oldx1 = gt_bbox[:, 0].copy()
@@ -474,7 +494,6 @@ class RandomFlipImage(BaseOperator):
                                                         height, width)
                 sample['flipped'] = True
                 sample['image'] = im
-                # sample['gt_mask'] = gt_mask
         sample = samples if batch_input else samples[0]
         return sample
 
@@ -497,13 +516,14 @@ class NormalizeBox(BaseOperator):
         return sample
 
 class PadBox(BaseOperator):
-    def __init__(self, num_max_boxes=50):
+    def __init__(self, num_max_boxes=50, process_mask=True):
         """
         Pad zeros to bboxes if number of bboxes is less than num_max_boxes.
         Args:
             num_max_boxes (int): the max number of bboxes
         """
         self.num_max_boxes = num_max_boxes
+        self.process_mask = process_mask
         super(PadBox, self).__init__()
 
     def __call__(self, sample, context=None):
@@ -518,11 +538,12 @@ class PadBox(BaseOperator):
         sample['gt_bbox'] = pad_bbox
 
         # 掩码
-        # mask = sample['gt_mask']
-        # pad_mask = np.zeros((mask.shape[0], mask.shape[1], num_max), dtype=np.float32)
-        # if gt_num > 0:
-        #     pad_mask[:, :, :gt_num] = mask[:, :, :gt_num]
-        # sample['gt_mask'] = pad_mask
+        if self.process_mask:
+            mask = sample['gt_mask']
+            pad_mask = np.zeros((mask.shape[0], mask.shape[1], num_max), dtype=np.float32)
+            if gt_num > 0:
+                pad_mask[:, :, :gt_num] = mask[:, :, :gt_num]
+            sample['gt_mask'] = pad_mask
 
         if 'gt_class' in fields:
             pad_class = np.zeros((num_max), dtype=np.int32)
@@ -572,7 +593,7 @@ class RandomShape(BaseOperator):
         random_inter (bool): whether to randomly interpolation, defalut true.
     """
 
-    def __init__(self, sizes=[320, 352, 384, 416, 448, 480, 512, 544, 576, 608], random_inter=True):
+    def __init__(self, sizes=[320, 352, 384, 416, 448, 480, 512, 544, 576, 608], random_inter=True, process_mask=False):
         super(RandomShape, self).__init__()
         self.sizes = sizes
         self.random_inter = random_inter
@@ -583,10 +604,11 @@ class RandomShape(BaseOperator):
             cv2.INTER_CUBIC,
             cv2.INTER_LANCZOS4,
         ] if random_inter else []
+        self.process_mask = process_mask
 
     def __call__(self, samples, context=None):
         shape = np.random.choice(self.sizes)
-        # mask_shape = shape // 4
+        mask_shape = shape // 4
         method = np.random.choice(self.interps) if self.random_inter \
             else cv2.INTER_NEAREST
         for i in range(len(samples)):
@@ -598,12 +620,13 @@ class RandomShape(BaseOperator):
                 im, None, None, fx=scale_x, fy=scale_y, interpolation=method)
             samples[i]['image'] = im
 
-            # gt_mask = samples[i]['gt_mask']
-            # 4倍下采样。与4倍下采样的特征图计算损失。
-            # 不能随机插值方法，有的方法不适合50个通道。
-            # gt_mask = cv2.resize(gt_mask, (mask_shape, mask_shape), interpolation=cv2.INTER_LINEAR)
-            # gt_mask = (gt_mask > 0.5).astype(np.float32)
-            # samples[i]['gt_mask'] = gt_mask
+            if self.process_mask:
+                gt_mask = samples[i]['gt_mask']
+                # 4倍下采样。与4倍下采样的特征图计算损失。
+                # 不能随机插值方法，有的方法不适合50个通道。
+                gt_mask = cv2.resize(gt_mask, (mask_shape, mask_shape), interpolation=cv2.INTER_LINEAR)
+                gt_mask = (gt_mask > 0.5).astype(np.float32)
+                samples[i]['gt_mask'] = gt_mask
         return samples
 
 class NormalizeImage(BaseOperator):
@@ -650,7 +673,7 @@ class NormalizeImage(BaseOperator):
                     im = im.astype(np.float32, copy=False)
                     if self.algorithm == 'YOLOv4':
                         im = im / 255.0
-                    elif self.algorithm == 'YOLOv3':
+                    elif self.algorithm == 'YOLOv3' or self.algorithm == 'YOLACT':
                         mean = np.array(self.mean)[np.newaxis, np.newaxis, :].astype(np.float32)
                         std = np.array(self.std)[np.newaxis, np.newaxis, :].astype(np.float32)
                         im -= mean
@@ -817,6 +840,175 @@ class Gt2YoloTarget(BaseOperator):
             batch_image[p, :, :, :] = im
             p += 1
         return batch_image, batch_label, batch_gt_bbox
+
+
+class Gt2YolactTarget(BaseOperator):
+    def __init__(self,
+                 anchors,
+                 anchor_masks,
+                 downsample_ratios,
+                 num_classes=80,
+                 iou_thresh=1.):
+        super(Gt2YolactTarget, self).__init__()
+        self.anchors = anchors
+        self.anchor_masks = anchor_masks
+        self.downsample_ratios = downsample_ratios
+        self.num_classes = num_classes
+        self.iou_thresh = iou_thresh
+
+    def __call__(self, samples, context=None):
+        assert len(self.anchor_masks) == len(self.downsample_ratios), \
+            "anchor_masks', and 'downsample_ratios' should have same length."
+
+        h, w = samples[0]['image'].shape[:2]
+        an_hw = np.array(self.anchors) / np.array([[w, h]])
+
+
+        batch_size = len(samples)
+        batch_image = np.zeros((batch_size, h, w, 3))
+        # 准备标记
+        batch_label_sbbox = np.zeros((batch_size, int(h / self.downsample_ratios[2]), int(w / self.downsample_ratios[2]),
+                                      len(self.anchor_masks[0]), 5 + self.num_classes))
+        batch_label_mbbox = np.zeros((batch_size, int(h / self.downsample_ratios[1]), int(w / self.downsample_ratios[1]),
+                                      len(self.anchor_masks[0]), 5 + self.num_classes))
+        batch_label_lbbox = np.zeros((batch_size, int(h / self.downsample_ratios[0]), int(w / self.downsample_ratios[0]),
+                                      len(self.anchor_masks[0]), 5 + self.num_classes))
+        M = samples[0]['gt_bbox'].shape[0]
+        batch_gt_bbox = np.zeros((batch_size, M, 4))
+        batch_label = [batch_label_lbbox, batch_label_mbbox, batch_label_sbbox]
+
+        # 用于语义分割损失
+        s8 = samples[0]['gt_mask'].shape[1] // 2
+        batch_gt_segment = np.zeros((batch_size, self.num_classes, s8, s8))
+
+        # 掩码
+        batch_gt_mask = np.zeros((batch_size, M, s8*2, s8*2))
+        batch_label_idx_sbbox = np.zeros((batch_size, M, 4))
+        batch_label_idx_mbbox = np.zeros((batch_size, M, 4))
+        batch_label_idx_lbbox = np.zeros((batch_size, M, 4))
+        batch_label_idx = [batch_label_idx_lbbox, batch_label_idx_mbbox, batch_label_idx_sbbox]
+
+        img_idx = 0
+        for sample in samples:
+            # im, gt_bbox, gt_class, gt_score = sample
+            im = sample['image']
+            gt_bbox = sample['gt_bbox']
+            gt_mask = sample['gt_mask']           # HWM，M是最大正样本数量，是50
+            gt_class = sample['gt_class']
+            gt_score = sample['gt_score']
+
+            # 用于语义分割损失
+            s8 = gt_mask.shape[1] // 2
+            downsampled_masks_s8 = cv2.resize(gt_mask, (s8, s8), interpolation=cv2.INTER_LINEAR)
+            downsampled_masks_s8 = downsampled_masks_s8.transpose(2, 0, 1)   # [50, s8, s8]
+            downsampled_masks_s8 = (downsampled_masks_s8 > 0.5).astype(np.float32)
+            gt_segment = np.zeros((self.num_classes, s8, s8))
+            idxs = np.where(gt_score > 0.00000001)[0]
+            for i2 in idxs:
+                gt_segment[gt_class[i2]] = np.maximum(gt_segment[gt_class[i2]], downsampled_masks_s8[i2])
+            batch_gt_segment[img_idx, :, :, :] = gt_segment.astype(np.float32)
+
+
+            gt_mask = gt_mask.transpose(2, 0, 1)  # MHW
+            batch_gt_mask[img_idx, :, :, :] = gt_mask
+
+            for i, (
+                    mask, downsample_ratio
+            ) in enumerate(zip(self.anchor_masks, self.downsample_ratios)):
+                grid_h = int(h / downsample_ratio)
+                grid_w = int(w / downsample_ratio)
+                target = np.zeros(
+                    (grid_h, grid_w, len(mask), 5 + self.num_classes),
+                    dtype=np.float32)
+                # 前3个用于把正样本的系数抽出来gather_nd()，后1个用于把掩码抽出来gather()。为了避免使用layers.where()后顺序没对上，所以不拆开写。
+                target_pos_idx_match_mask_idx = np.zeros((M, 4), dtype=np.int32) - 1
+                p = 0
+                for b in range(gt_bbox.shape[0]):
+                    gx, gy, gw, gh = gt_bbox[b, :]
+                    cls = gt_class[b]
+                    score = gt_score[b]
+                    if gw <= 0. or gh <= 0. or score <= 0.:
+                        continue
+
+                    # find best match anchor index
+                    best_iou = 0.
+                    best_idx = -1
+                    for an_idx in range(an_hw.shape[0]):
+                        iou = jaccard_overlap(
+                            [0., 0., gw, gh],
+                            [0., 0., an_hw[an_idx, 0], an_hw[an_idx, 1]])
+                        if iou > best_iou:
+                            best_iou = iou
+                            best_idx = an_idx
+
+                    gi = int(gx * grid_w)
+                    gj = int(gy * grid_h)
+
+                    # gtbox should be regresed in this layes if best match
+                    # anchor index in anchor mask of this layer
+                    if best_idx in mask:
+                        best_n = mask.index(best_idx)
+
+                        # x, y, w, h, scale
+                        target[gj, gi, best_n, 0] = gx * w
+                        target[gj, gi, best_n, 1] = gy * h
+                        target[gj, gi, best_n, 2] = gw * w
+                        target[gj, gi, best_n, 3] = gh * h
+
+                        # objectness record gt_score
+                        target[gj, gi, best_n, 4] = score
+
+                        # classification
+                        # onehot = np.zeros(self.num_classes, dtype=np.float)
+                        # onehot[cls] = 1.0
+                        # uniform_distribution = np.full(self.num_classes, 1.0 / self.num_classes)
+                        # deta = 0.01
+                        # smooth_onehot = onehot * (1 - deta) + deta * uniform_distribution
+                        # target[gj, gi, best_n, 5:] = smooth_onehot
+                        target[gj, gi, best_n, 5+cls] = 1.0
+
+                        # 掩码部分
+                        target_pos_idx_match_mask_idx[p, :] = np.array([gj, gi, best_n, b])
+                        p += 1
+
+                    # For non-matched anchors, calculate the target if the iou
+                    # between anchor and gt is larger than iou_thresh
+                    if self.iou_thresh < 1:
+                        for idx, mask_i in enumerate(mask):
+                            if mask_i == best_idx: continue
+                            iou = jaccard_overlap(
+                                [0., 0., gw, gh],
+                                [0., 0., an_hw[mask_i, 0], an_hw[mask_i, 1]])
+                            if iou > self.iou_thresh:
+                                # x, y, w, h, scale
+                                target[gj, gi, idx, 0] = gx * w
+                                target[gj, gi, idx, 1] = gy * h
+                                target[gj, gi, idx, 2] = gw * w
+                                target[gj, gi, idx, 3] = gh * h
+
+                                # objectness record gt_score
+                                target[gj, gi, idx, 4] = score
+
+                                # classification
+                                # onehot = np.zeros(self.num_classes, dtype=np.float)
+                                # onehot[cls] = 1.0
+                                # uniform_distribution = np.full(self.num_classes, 1.0 / self.num_classes)
+                                # deta = 0.01
+                                # smooth_onehot = onehot * (1 - deta) + deta * uniform_distribution
+                                # target[gj, gi, idx, 5:] = smooth_onehot
+                                target[gj, gi, best_n, 5+cls] = 1.0
+                # sample['target{}'.format(i)] = target
+                batch_label[i][img_idx, :, :, :, :] = target
+                batch_gt_bbox[img_idx, :, :] = gt_bbox * [w, h, w, h]
+
+                # 如果这一输出层没有gt，一定要分配一个坐标使得layers.gather()函数成功。
+                # 没有坐标的话，gather()函数会出现难以解决的错误。
+                if target_pos_idx_match_mask_idx[0, 0] < 0:
+                    target_pos_idx_match_mask_idx[0, :] = np.array([0, 0, 0, 0])
+                batch_label_idx[i][img_idx, :, :] = target_pos_idx_match_mask_idx
+            batch_image[img_idx, :, :, :] = im
+            img_idx += 1
+        return batch_image, batch_label, batch_gt_bbox, batch_gt_segment, batch_gt_mask, batch_label_idx
 
 
 
