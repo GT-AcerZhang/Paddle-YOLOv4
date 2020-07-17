@@ -85,9 +85,9 @@ class YOLOv4_Config_1(object):
         self.infer_model_path = './weights/66000'
 
         # infer_input_shape越大，精度会上升，但速度会下降。
-        # self.infer_input_shape = (320, 320)
+        self.infer_input_shape = (320, 320)
         # self.infer_input_shape = (416, 416)
-        self.infer_input_shape = (608, 608)
+        # self.infer_input_shape = (608, 608)
 
         # 推理时的分数阈值和nms_iou阈值
         self.infer_conf_thresh = 0.05
@@ -178,9 +178,9 @@ class YOLOv3_Config_1(object):
         # self.infer_model_path = './weights/1000'
 
         # infer_input_shape越大，精度会上升，但速度会下降。
-        # self.infer_input_shape = (320, 320)
+        self.infer_input_shape = (320, 320)
         # self.infer_input_shape = (416, 416)
-        self.infer_input_shape = (608, 608)
+        # self.infer_input_shape = (608, 608)
 
         # 推理时的分数阈值和nms_iou阈值
         self.infer_conf_thresh = 0.05
