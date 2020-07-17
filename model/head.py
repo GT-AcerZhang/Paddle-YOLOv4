@@ -493,6 +493,7 @@ class YOLACTHead(object):
                         regularizer=L2Decay(0.),
                         name=self.prefix_name +
                              "yolo_output.{}.conv.bias".format(i)))
+                # block_out.stop_gradient = True
                 outputs.append(block_out)
 
                 mcf_out = fluid.layers.conv2d(

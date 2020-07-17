@@ -201,21 +201,18 @@ class YOLACT_Config_1(object):
     def __init__(self):
         self.algorithm = 'YOLACT'
 
-        # 自定义数据集
-        # self.train_path = 'annotation_json/voc2012_train.json'
-        # self.val_path = 'annotation_json/voc2012_val.json'
-        # self.classes_path = 'data/voc_classes.txt'
-        # self.train_pre_path = '../VOCdevkit/VOC2012/JPEGImages/'   # 训练集图片相对路径
-        # self.val_pre_path = '../VOCdevkit/VOC2012/JPEGImages/'     # 验证集图片相对路径
-
         # COCO数据集
         self.train_path = '../data/data7122/annotations/instances_train2017.json'
-        # self.train_path = '../data/data7122/annotations/instances_val2017.json'
         self.val_path = '../data/data7122/annotations/instances_val2017.json'
         self.classes_path = 'data/coco_classes.txt'
         self.train_pre_path = '../data/data7122/train2017/'  # 训练集图片相对路径
-        # self.train_pre_path = '../data/data7122/val2017/'      # 验证集图片相对路径
         self.val_pre_path = '../data/data7122/val2017/'      # 验证集图片相对路径
+
+        # self.train_path = '../COCO/annotations/instances_val2017.json'
+        # self.val_path = '../COCO/annotations/instances_val2017.json'
+        # self.classes_path = 'data/coco_classes.txt'
+        # self.train_pre_path = '../COCO/val2017/'  # 训练集图片相对路径
+        # self.val_pre_path = '../COCO/val2017/'      # 验证集图片相对路径
 
         # 训练时若预测框与所有的gt小于阈值self.iou_loss_thresh时视为反例
         self.iou_loss_thresh = 0.7

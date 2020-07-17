@@ -319,7 +319,8 @@ if __name__ == '__main__':
             label_mbbox = P.data(name='input_3', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False, dtype='float32')
             label_lbbox = P.data(name='input_4', shape=[-1, -1, -1, 3, (num_classes + 5)], append_batch_size=False, dtype='float32')
             true_bboxes = P.data(name='input_5', shape=[cfg.num_max_boxes, 4], dtype='float32')
-            args = [outputs, mcf_outputs, proto_out, segm, label_sbbox, label_mbbox, label_lbbox, true_bboxes]
+            # args = [outputs, mcf_outputs, proto_out, segm, label_sbbox, label_mbbox, label_lbbox, true_bboxes]
+            args = [outputs[0], outputs[1], outputs[2], label_sbbox, label_mbbox, label_lbbox, true_bboxes]
             ciou_loss, conf_loss, prob_loss = yolact_loss(args, num_classes, cfg.iou_loss_thresh, _anchors)
             loss = ciou_loss + conf_loss + prob_loss
 
@@ -336,7 +337,7 @@ if __name__ == '__main__':
             head = YOLACTHead(keep_prob=1.0)   # 一定要设置keep_prob=1.0, 为了得到一致的推理结果
             yolact = YOLACT(backbone, head)
             outputs, mcf_outputs, proto_out, segm = yolact(inputs)
-            eval_fetch_list = [output_l, output_m, output_s]
+            eval_fetch_list = [outputs[0], outputs[1], outputs[2]]
     eval_prog = eval_prog.clone(for_test=True)
 
     # 参数随机初始化
@@ -434,6 +435,23 @@ if __name__ == '__main__':
             # 等待所有线程任务结束。
             for t in threads:
                 t.join()
+
+            # 看掩码图片
+            # for sample in samples:
+            #     im = sample['image']
+            #     gt_bbox = sample['gt_bbox']
+            #     gt_mask = sample['gt_mask']  # HWM，M是最大正样本数量，是50
+            #     gt_class = sample['gt_class']
+            #     gt_score = sample['gt_score']
+            #     im_name = np.random.randint(0, 1000000)
+            #     n = gt_mask.shape[2]
+            #     cv2.imwrite('%d.jpg' % im_name, cv2.cvtColor(im, cv2.COLOR_RGB2BGR))
+            #     for i in range(n):
+            #         if gt_score[i] < 0.001:
+            #             continue
+            #         mm = gt_mask[:, :, i]
+            #         un = np.unique(mm)
+            #         cv2.imwrite('%d_%.2d.jpg' % (im_name, i), mm * 255)
 
             # batch_transforms
             samples = randomShape(samples, context)
