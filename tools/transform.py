@@ -875,6 +875,7 @@ class Gt2YolactTarget(BaseOperator):
                                       len(self.anchor_masks[0]), 5 + self.num_classes))
         M = samples[0]['gt_bbox'].shape[0]
         batch_gt_bbox = np.zeros((batch_size, M, 4))
+        batch_gt_class = np.zeros((batch_size, M, ))
         batch_label = [batch_label_lbbox, batch_label_mbbox, batch_label_sbbox]
 
         # 用于语义分割损失
@@ -896,6 +897,9 @@ class Gt2YolactTarget(BaseOperator):
             gt_mask = sample['gt_mask']           # HWM，M是最大正样本数量，是50
             gt_class = sample['gt_class']
             gt_score = sample['gt_score']
+
+            batch_gt_bbox[img_idx, :, :] = gt_bbox * [w, h, w, h]
+            batch_gt_class[img_idx, :, :] = gt_class
 
             # 用于语义分割损失
             s8 = gt_mask.shape[1] // 2
@@ -999,7 +1003,6 @@ class Gt2YolactTarget(BaseOperator):
                                 target[gj, gi, best_n, 5+cls] = 1.0
                 # sample['target{}'.format(i)] = target
                 batch_label[i][img_idx, :, :, :, :] = target
-                batch_gt_bbox[img_idx, :, :] = gt_bbox * [w, h, w, h]
 
                 # 如果这一输出层没有gt，一定要分配一个坐标使得layers.gather()函数成功。
                 # 没有坐标的话，gather()函数会出现难以解决的错误。
@@ -1008,7 +1011,7 @@ class Gt2YolactTarget(BaseOperator):
                 batch_label_idx[i][img_idx, :, :] = target_pos_idx_match_mask_idx
             batch_image[img_idx, :, :, :] = im
             img_idx += 1
-        return batch_image, batch_label, batch_gt_bbox, batch_gt_segment, batch_gt_mask, batch_label_idx
+        return batch_image, batch_label, batch_gt_bbox, batch_gt_class, batch_gt_segment, batch_gt_mask, batch_label_idx
 
 
 

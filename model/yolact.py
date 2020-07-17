@@ -24,11 +24,20 @@ class YOLACT(object):
         # if export:
         #     return yolo_decode(output_l, output_m, output_s, postprocess, param)
 
+        output_l = outputs[0]
+        output_m = outputs[1]
+        output_s = outputs[2]
+        mcf_l = mcf_outputs[0]
+        mcf_m = mcf_outputs[1]
+        mcf_s = mcf_outputs[2]
         # 相当于numpy的transpose()，交换下标
-        # output_l = fluid.layers.transpose(output_l, perm=[0, 2, 3, 1], name='output_l')
-        # output_m = fluid.layers.transpose(output_m, perm=[0, 2, 3, 1], name='output_m')
-        # output_s = fluid.layers.transpose(output_s, perm=[0, 2, 3, 1], name='output_s')
-        return outputs, mcf_outputs, proto_out, segm
+        output_l = fluid.layers.transpose(output_l, perm=[0, 2, 3, 1], name='output_l')
+        output_m = fluid.layers.transpose(output_m, perm=[0, 2, 3, 1], name='output_m')
+        output_s = fluid.layers.transpose(output_s, perm=[0, 2, 3, 1], name='output_s')
+        mcf_l = fluid.layers.transpose(mcf_l, perm=[0, 2, 3, 1], name='mcf_l')
+        mcf_m = fluid.layers.transpose(mcf_m, perm=[0, 2, 3, 1], name='mcf_m')
+        mcf_s = fluid.layers.transpose(mcf_s, perm=[0, 2, 3, 1], name='mcf_s')
+        return output_l, output_m, output_s, mcf_l, mcf_m, mcf_s, proto_out, segm
 
 
 
