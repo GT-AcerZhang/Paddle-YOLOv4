@@ -131,7 +131,7 @@ class YOLOv3_Config_1(object):
         # 模式。 0-从头训练，1-读取之前的模型继续训练（model_path可以是'yolov4.h5'、'./weights/step00001000.h5'这些。）
         self.pattern = 1
         self.lr = 0.00001
-        self.batch_size = 8
+        self.batch_size = 30
         # 如果self.pattern = 1，需要指定self.model_path表示从哪个模型读取权重继续训练。
         self.model_path = 'yolov3_r50vd_dcn_obj365_dropblock_iouloss'
         # self.model_path = './weights/1000'
@@ -140,7 +140,7 @@ class YOLOv3_Config_1(object):
         # 每隔几步保存一次模型
         self.save_iter = 1000
         # 每隔几步计算一次eval集的mAP
-        self.eval_iter = 5000
+        self.eval_iter = 1000
         # 训练多少步
         self.max_iters = 800000
 

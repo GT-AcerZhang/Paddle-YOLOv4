@@ -516,7 +516,7 @@ class NormalizeBox(BaseOperator):
         return sample
 
 class PadBox(BaseOperator):
-    def __init__(self, num_max_boxes=50, process_mask=True):
+    def __init__(self, num_max_boxes=50, process_mask=False):
         """
         Pad zeros to bboxes if number of bboxes is less than num_max_boxes.
         Args:
