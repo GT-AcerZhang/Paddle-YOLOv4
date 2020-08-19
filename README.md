@@ -34,9 +34,6 @@ Paddle版SOLO: https://github.com/miemie2013/Paddle-SOLO
 
 ## 更新日记
 
-2020/06/18:经过验证，Paddle镜像版YOLOv4：https://github.com/miemie2013/Paddle-YOLOv4
-，可以刷到43.4mAP（不冻结任何层的情况下），赶紧star我的Paddle版YOLOv4，去AIStudio抢显卡训练吧！
-
 2020/06/25:支持yolact中的fastnms。运行demo_fast.py即可体验。经过试验发现并没有官方的yolo_box()、multiclass_nms()快。可能需要用C++ op重写。
 
 2020/07/16:加入YOLOv3增强版。见https://github.com/PaddlePaddle/PaddleDetection/blob/release/0.3/docs/featured_model/YOLOv3_ENHANCEMENT.md
