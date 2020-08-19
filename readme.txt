@@ -10,6 +10,7 @@ unzip yolov4.zip
 
 
 # 安装依赖、解压COCO2017数据集
+nvidia-smi
 cd ~
 pip install pycocotools
 cd data
