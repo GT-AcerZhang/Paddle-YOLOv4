@@ -154,7 +154,7 @@ if __name__ == '__main__':
 
     # 选择配置
     cfg = YOLOv4_Config_1()
-    cfg = YOLOv3_Config_1()
+    # cfg = YOLOv3_Config_1()
 
 
     # =============== 以下不用设置 ===============
