@@ -298,47 +298,47 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
     x = stack_residual_block(x, i32, i64, n=1, conv_start_idx=5, is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i64, 1, stride=1, name='conv007', is_test=is_test, trainable=trainable)
     x = fluid.layers.concat([x, s2], axis=1)
-    x = conv2d_unit(x, i64, 1, stride=1, name='conv008', is_test=is_test, trainable=trainable)
+    s2 = conv2d_unit(x, i64, 1, stride=1, name='conv008', is_test=is_test, trainable=trainable)
 
     # ============================= s4 =============================
-    x = conv2d_unit(x, i128, 3, stride=2, padding=1, name='conv009', is_test=is_test, trainable=trainable)
+    x = conv2d_unit(s2, i128, 3, stride=2, padding=1, name='conv009', is_test=is_test, trainable=trainable)
     s4 = conv2d_unit(x, i64, 1, stride=1, name='conv010', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i64, 1, stride=1, name='conv011', is_test=is_test, trainable=trainable)
     x = stack_residual_block(x, i64, i64, n=2, conv_start_idx=12, is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i64, 1, stride=1, name='conv016', is_test=is_test, trainable=trainable)
     x = fluid.layers.concat([x, s4], axis=1)
-    x = conv2d_unit(x, i128, 1, stride=1, name='conv017', is_test=is_test, trainable=trainable)
+    s4 = conv2d_unit(x, i128, 1, stride=1, name='conv017', is_test=is_test, trainable=trainable)
 
     # ============================= s8 =============================
-    x = conv2d_unit(x, i256, 3, stride=2, padding=1, name='conv018', is_test=is_test, trainable=trainable)
+    x = conv2d_unit(s4, i256, 3, stride=2, padding=1, name='conv018', is_test=is_test, trainable=trainable)
     s8 = conv2d_unit(x, i128, 1, stride=1, name='conv019', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i128, 1, stride=1, name='conv020', is_test=is_test, trainable=trainable)
     x = stack_residual_block(x, i128, i128, n=8, conv_start_idx=21, is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i128, 1, stride=1, name='conv037', is_test=is_test, trainable=trainable)
-    s8 = fluid.layers.concat([x, s8], axis=1)
-    x = conv2d_unit(s8, i256, 1, stride=1, name='conv038', is_test=is_test, trainable=trainable)
+    x = fluid.layers.concat([x, s8], axis=1)
+    s8 = conv2d_unit(x, i256, 1, stride=1, name='conv038', is_test=is_test, trainable=trainable)
 
     # ============================= s16 =============================
-    x = conv2d_unit(x, i512, 3, stride=2, padding=1, name='conv039', is_test=is_test, trainable=trainable)
+    x = conv2d_unit(s8, i512, 3, stride=2, padding=1, name='conv039', is_test=is_test, trainable=trainable)
     s16 = conv2d_unit(x, i256, 1, stride=1, name='conv040', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i256, 1, stride=1, name='conv041', is_test=is_test, trainable=trainable)
     x = stack_residual_block(x, i256, i256, n=8, conv_start_idx=42, is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i256, 1, stride=1, name='conv058', is_test=is_test, trainable=trainable)
-    s16 = fluid.layers.concat([x, s16], axis=1)
-    x = conv2d_unit(s16, i512, 1, stride=1, name='conv059', is_test=is_test, trainable=trainable)
+    x = fluid.layers.concat([x, s16], axis=1)
+    s16 = conv2d_unit(x, i512, 1, stride=1, name='conv059', is_test=is_test, trainable=trainable)
 
     # ============================= s32 =============================
-    x = conv2d_unit(x, i1024, 3, stride=2, padding=1, name='conv060', is_test=is_test, trainable=trainable)
+    x = conv2d_unit(s16, i1024, 3, stride=2, padding=1, name='conv060', is_test=is_test, trainable=trainable)
     s32 = conv2d_unit(x, i512, 1, stride=1, name='conv061', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i512, 1, stride=1, name='conv062', is_test=is_test, trainable=trainable)
     x = stack_residual_block(x, i512, i512, n=4, conv_start_idx=63, is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i512, 1, stride=1, name='conv071', is_test=is_test, trainable=trainable)
     x = fluid.layers.concat([x, s32], axis=1)
-    x = conv2d_unit(x, i1024, 1, stride=1, name='conv072', is_test=is_test, trainable=trainable)
+    s32 = conv2d_unit(x, i1024, 1, stride=1, name='conv072', is_test=is_test, trainable=trainable)
     # cspdarknet53部分结束
 
     # fpn部分
-    x = conv2d_unit(x, i512, 1, stride=1, act='leaky', name='conv073', is_test=is_test, trainable=trainable)
+    x = conv2d_unit(s32, i512, 1, stride=1, act='leaky', name='conv073', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i1024, 3, stride=1, padding=1, act='leaky', name='conv074', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i512, 1, stride=1, act='leaky', name='conv075', is_test=is_test, trainable=trainable)
     x = _spp(x)

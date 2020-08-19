@@ -81,8 +81,8 @@ class YOLOv4_Config_1(object):
 
         # ============= 推理、导出时相关 =============
         # 读取的模型
-        # self.infer_model_path = 'yolov4'
-        self.infer_model_path = './weights/66000'
+        self.infer_model_path = 'yolov4'
+        # self.infer_model_path = './weights/66000'
 
         # infer_input_shape越大，精度会上升，但速度会下降。
         self.infer_input_shape = (320, 320)

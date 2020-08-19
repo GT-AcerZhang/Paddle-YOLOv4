@@ -40,8 +40,8 @@ use_gpu = True
 
 if __name__ == '__main__':
     # 选择配置
-    # cfg = YOLOv4_Config_1()
-    cfg = YOLOv3_Config_1()
+    cfg = YOLOv4_Config_1()
+    # cfg = YOLOv3_Config_1()
 
 
     algorithm = cfg.algorithm
@@ -64,10 +64,10 @@ if __name__ == '__main__':
     eval_batch_size = cfg.eval_batch_size
 
     # 验证集图片的相对路径
-    # eval_pre_path = '../COCO/val2017/'
-    # anno_file = '../COCO/annotations/instances_val2017.json'
-    eval_pre_path = cfg.val_pre_path
-    anno_file = cfg.val_path
+    eval_pre_path = '../COCO/val2017/'
+    anno_file = '../COCO/annotations/instances_val2017.json'
+    # eval_pre_path = cfg.val_pre_path
+    # anno_file = cfg.val_path
     with open(anno_file, 'r', encoding='utf-8') as f2:
         for line in f2:
             line = line.strip()
