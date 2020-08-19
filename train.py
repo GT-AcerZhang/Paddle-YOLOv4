@@ -290,8 +290,8 @@ if __name__ == '__main__':
     use_gpu = True
 
     # 选择配置
-    # cfg = YOLOv4_Config_1()
-    cfg = YOLOv3_Config_1()
+    cfg = YOLOv4_Config_1()
+    # cfg = YOLOv3_Config_1()
 
 
     algorithm = cfg.algorithm
