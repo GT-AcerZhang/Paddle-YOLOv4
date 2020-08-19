@@ -347,6 +347,7 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
     x = conv2d_unit(x, i1024, 3, stride=1, padding=1, act='leaky', name='conv077', is_test=is_test, trainable=trainable)
     fpn_s32 = conv2d_unit(x, i512, 1, stride=1, act='leaky', name='conv078', is_test=is_test, trainable=trainable)
 
+    # pan01
     x = conv2d_unit(fpn_s32, i256, 1, stride=1, act='leaky', name='conv079', is_test=is_test, trainable=trainable)
     x = fluid.layers.resize_nearest(x, scale=float(2))
     s16 = conv2d_unit(s16, i256, 1, stride=1, act='leaky', name='conv080', is_test=is_test, trainable=trainable)
@@ -356,24 +357,27 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
     x = conv2d_unit(x, i256, 1, stride=1, act='leaky', name='conv083', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i512, 3, stride=1, padding=1, act='leaky', name='conv084', is_test=is_test, trainable=trainable)
     fpn_s16 = conv2d_unit(x, i256, 1, stride=1, act='leaky', name='conv085', is_test=is_test, trainable=trainable)
+    # pan01结束
 
+    # pan02
     x = conv2d_unit(fpn_s16, i128, 1, stride=1, act='leaky', name='conv086', is_test=is_test, trainable=trainable)
     x = fluid.layers.resize_nearest(x, scale=float(2))
     s8 = conv2d_unit(s8, i128, 1, stride=1, act='leaky', name='conv087', is_test=is_test, trainable=trainable)
     x = fluid.layers.concat([s8, x], axis=1)
-
-    # output_s
     x = conv2d_unit(x, i128, 1, stride=1, act='leaky', name='conv088', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i256, 3, stride=1, padding=1, act='leaky', name='conv089', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i128, 1, stride=1, act='leaky', name='conv090', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i256, 3, stride=1, padding=1, act='leaky', name='conv091', is_test=is_test, trainable=trainable)
     x = conv2d_unit(x, i128, 1, stride=1, act='leaky', name='conv092', is_test=is_test, trainable=trainable)
+    # pan02结束
+
+    # output_s, 不用concat()
     output_s = conv2d_unit(x, i256, 3, stride=1, padding=1, act='leaky', name='conv093', is_test=is_test,
                            trainable=trainable)
     output_s = conv2d_unit(output_s, num_anchors * (num_classes + 5), 1, stride=1, bn=0, act=None, name='conv094',
                            is_test=is_test, trainable=trainable)
 
-    # output_m
+    # output_m, 需要concat()
     x = conv2d_unit(x, i256, 3, stride=2, padding=1, act='leaky', name='conv095', is_test=is_test, trainable=trainable)
     x = fluid.layers.concat([x, fpn_s16], axis=1)
     x = conv2d_unit(x, i256, 1, stride=1, act='leaky', name='conv096', is_test=is_test, trainable=trainable)
@@ -386,7 +390,7 @@ def YOLOv4(inputs, num_classes, num_anchors, initial_filters=32, is_test=False, 
     output_m = conv2d_unit(output_m, num_anchors * (num_classes + 5), 1, stride=1, bn=0, act=None, name='conv102',
                            is_test=is_test, trainable=trainable)
 
-    # output_l
+    # output_l, 需要concat()
     x = conv2d_unit(x, i512, 3, stride=2, padding=1, act='leaky', name='conv103', is_test=is_test, trainable=trainable)
     x = fluid.layers.concat([x, fpn_s32], axis=1)
     x = conv2d_unit(x, i512, 1, stride=1, act='leaky', name='conv104', is_test=is_test, trainable=trainable)
