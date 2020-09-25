@@ -16,6 +16,7 @@ __pycache__/
 /model/__pycache__/
 
 
+/serving_model/
 /inference_model/
 /output/
 /yolov3*/

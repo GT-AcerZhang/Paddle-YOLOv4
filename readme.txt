@@ -63,6 +63,11 @@ python deploy_infer.py --model_dir inference_model --play_video D://PycharmProje
 
 
 
+python export_serving_model.py
+
+
+python -m paddle_serving_server_gpu.serve --model ./serving_model --port 9494 --gpu_ids 0
+
 
 
 
