@@ -63,6 +63,22 @@ python deploy_infer.py --model_dir inference_model --play_video D://PycharmProje
 
 
 
+
+
+--------------------------导出Paddle Serving--------------------------
+pip install paddle-serving-client==0.3.2
+
+
+# CPU
+pip install paddle-serving-server==0.3.2
+
+# GPU with CUDA9.0
+pip install paddle-serving-server-gpu==0.3.2.post9
+
+# GPU with CUDA10.0
+pip install paddle-serving-server-gpu==0.3.2.post10
+
+
 python export_serving_model.py
 
 

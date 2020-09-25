@@ -16,6 +16,7 @@ __pycache__/
 /model/__pycache__/
 
 
+/workdir_*/
 /serving_model/
 /inference_model/
 /output/
