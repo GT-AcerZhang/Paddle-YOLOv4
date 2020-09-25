@@ -65,38 +65,6 @@ class Decode(object):
             t.join()
         return result_image, result_boxes, result_scores, result_classes
 
-    # 处理视频
-    def detect_video(self, video):
-        video_path = os.path.join("videos", "test", video)
-        camera = cv2.VideoCapture(video_path)
-        cv2.namedWindow("detection", cv2.WINDOW_AUTOSIZE)
-
-        # Prepare for saving the detected video
-        sz = (int(camera.get(cv2.CAP_PROP_FRAME_WIDTH)),
-              int(camera.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-        fourcc = cv2.VideoWriter_fourcc(*'mpeg')
-
-        vout = cv2.VideoWriter()
-        vout.open(os.path.join("videos", "res", video), fourcc, 20, sz, True)
-
-        while True:
-            res, frame = camera.read()
-
-            if not res:
-                break
-
-            image = self.detect_image(frame)
-            cv2.imshow("detection", image)
-
-            # Save the video frame by frame
-            vout.write(image)
-
-            if cv2.waitKey(110) & 0xff == 27:
-                break
-
-        vout.release()
-        camera.release()
-
     def draw(self, image, boxes, scores, classes):
         image_h, image_w, _ = image.shape
         # 定义颜色

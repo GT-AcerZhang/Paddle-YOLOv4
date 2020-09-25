@@ -66,23 +66,42 @@ python deploy_infer.py --model_dir inference_model --play_video D://PycharmProje
 
 
 --------------------------导出Paddle Serving--------------------------
-pip install paddle-serving-client==0.3.2
+pip install --user paddle-serving-client==0.3.2 -i https://mirror.baidu.com/pypi/simple
 
 
 # CPU
-pip install paddle-serving-server==0.3.2
+pip install --user paddle-serving-server==0.3.2 -i https://mirror.baidu.com/pypi/simple
 
 # GPU with CUDA9.0
-pip install paddle-serving-server-gpu==0.3.2.post9
+pip install --user paddle-serving-server-gpu==0.3.2.post9 -i https://mirror.baidu.com/pypi/simple
 
 # GPU with CUDA10.0
-pip install paddle-serving-server-gpu==0.3.2.post10
+pip install --user paddle-serving-server-gpu==0.3.2.post10 -i https://mirror.baidu.com/pypi/simple
 
 
 python export_serving_model.py
 
 
-python -m paddle_serving_server_gpu.serve --model ./serving_model --port 9494 --gpu_ids 0
+python -m paddle_serving_server_gpu.serve --model ./serving_model/serving_server --port 9494 --gpu_ids 0
+
+
+请求
+python test_client.py serving_model/serving_client/serving_client_conf.prototxt infer_cfg.yml images/test/000000000019.jpg
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
